@@ -119,14 +119,14 @@ Reset:
 The report for this study : TBD
 
 BibTex citation : TBD
-```
-@misc{,
-  author       = {Erik Schulze},
-  title        = {{Model-based Reinforcement Learning for Accelerated Learning From CFD Simulations}},
-  month        = ,
-  year         = ,
-  publisher    = {},
-  doi          = {},
-  url          = {}
-}
-```
+<!--- ``` --->
+<!--- @misc{, --->
+  <!--- author       = {Erik Schulze}, --->
+  <!--- title        = {{Model-based Reinforcement Learning for Accelerated Learning From CFD Simulations}}, --->
+  <!--- month        = , --->
+  <!--- year         = , --->
+  <!--- publisher    = {}, --->
+  <!--- doi          = {}, --->
+  <!--- url          = {} --->
+<!--- } --->
+<!--- ``` --->
