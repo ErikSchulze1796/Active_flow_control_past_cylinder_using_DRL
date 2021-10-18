@@ -4,7 +4,7 @@ This research project is a direct continuation of the work by [Darshan Thummar](
 - *test_cases*: OpenFOAM simulation setups
 
 ## Setting up the Cluster for Training (SLURM workload manager)
-### python-libraries :
+### Setup of Cluster Environment:
 
 Python libraries in cluster is installed by creating virtual environment as,
 
@@ -14,6 +14,7 @@ python3 -m pip install --user virtualenv
 python3 -m virtualenv venv
 ```
 
+### Setup of Virtual Environment on Cluster:
 To activate the virtual environment:
 
 ```
