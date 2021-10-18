@@ -120,13 +120,13 @@ The report for this study : TBD
 
 BibTex citation : TBD
 ```
-[//]: # (@misc{,
+@misc{,
   author       = {Erik Schulze},
   title        = {{Model-based Reinforcement Learning for Accelerated Learning From CFD Simulations}},
-  month        = february,
-  year         = 2022,
+  month        = ,
+  year         = ,
   publisher    = {},
   doi          = {},
   url          = {}
-})
+}
 ```
