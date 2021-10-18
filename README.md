@@ -3,6 +3,35 @@
 This research project is a direct continuation of the work by [Darshan Thummar](https://github.com/darshan315/flow_past_cylinder_by_DRL) and [Fabian Gabriel](https://github.com/FabianGabriel/Active_flow_control_past_cylinder_using_DRL). The repository is structured as follows:
 - *test_cases*: OpenFOAM simulation setups
 
+## Setting up the Cluster for Training (SLURM workload manager)
+### python-libraries :
+
+Python libraries in cluster is installed by creating virtual environment as,
+
+```
+module load python/3.7 
+python3 -m pip install --user virtualenv 
+python3 -m virtualenv venv
+```
+
+To activate the virtual environment:
+
+```
+source venv/bin/activate
+```
+
+To deactivate the virtual environment:
+
+```
+deactivate
+```
+
+To install the python libraries in venv virtual environment:
+
+```
+pip install -r ./DRL_py/docker/requirements.tx
+```
+
 ## Getting started
 
 To run a test case, create a *run* folder (ignored by version control), copy the case from *test_cases* to *run*, and execute the *Allrun* script. To run with Singularity, the image has to be built fist; see *Singularity and SLURM*.
