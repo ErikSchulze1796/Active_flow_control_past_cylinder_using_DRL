@@ -1,4 +1,4 @@
-# Active control of the flow past a cylinder at varying Reynolds number
+# Model-based Reinforcement Learning for Accelerated Learning From CFD Simulations 
 
 This research project is a direct continuation of the work by [Darshan Thummar](https://github.com/darshan315/flow_past_cylinder_by_DRL) and [Fabian Gabriel](https://github.com/FabianGabriel/Active_flow_control_past_cylinder_using_DRL). The repository is structured as follows:
 - *test_cases*: OpenFOAM simulation setups
