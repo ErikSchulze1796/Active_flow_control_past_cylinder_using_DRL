@@ -14,6 +14,13 @@ python3 -m pip install --user virtualenv
 python3 -m virtualenv venv
 ```
 
+Sync your repository with the cluster:
+
+```
+
+```
+
+
 ### Setup of Virtual Environment on Cluster:
 To activate the virtual environment:
 
@@ -26,6 +33,8 @@ To deactivate the virtual environment:
 ```
 deactivate
 ```
+
+
 
 To install the python libraries in venv virtual environment:
 
@@ -104,3 +113,20 @@ Choose a setup:
 Reset:
 
 `sbatch cleanup.sh`
+
+# Report
+
+The report for this study : TBD
+
+BibTex citation : TBD
+```
+[//]: # (@misc{,
+  author       = {Erik Schulze},
+  title        = {{Model-based Reinforcement Learning for Accelerated Learning From CFD Simulations}},
+  month        = february,
+  year         = 2022,
+  publisher    = {},
+  doi          = {},
+  url          = {}
+})
+```
