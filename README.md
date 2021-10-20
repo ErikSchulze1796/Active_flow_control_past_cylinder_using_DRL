@@ -59,10 +59,13 @@ cd run/cylinder2D_base
 ```
 sudo singularity build of_v2012.sif docker://andreweiner/of_pytorch:of2012-py1.7.1-cpu
 ```
-To run a simulation with Singularity, use the dedicated *Allrun.singularity* scripts. TU Braunschweig's HPC uses the SLURM scheduler. The repository contains an annotated example *jobscript*. The script expects the Singularity image in the top level directory of this repository and the simulation folder in *run*. To submit a job, run:
+To run a simulation with Singularity, use the dedicated *Allrun.singularity* scripts. TU Braunschweig's HPC uses the SLURM scheduler. The repository contains an annotated example *jobscript* file. The script expects the Singularity image in the top level directory of this repository and the simulation folder in *run*. To submit a job, run and replace *name_of_simulation* with he folder that contains it:
 
 ```
 sbatch jobscript name_of_simulation
+// Example:
+sbatch jobscript cylinder2D_base
+
 ```
 To show all running jobs of a user, use `squeue -u $USER`. Another helpful command is `quota -s` to check the available disk space.
 
