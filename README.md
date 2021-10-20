@@ -67,10 +67,7 @@ sbatch jobscript name_of_simulation
 sbatch jobscript cylinder2D_base
 ```
 To show all running jobs of a user, use `squeue -u $USER`. Another helpful command is `quota -s` to check the available disk space.
-If you want to cancel a job just use the command:
-```
-scancel JOBID
-```
+If you want to cancel a job just use the command `scancel JOBID`.
 
 ## Starting a Training
 
