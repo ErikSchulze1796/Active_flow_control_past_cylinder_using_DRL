@@ -6,18 +6,15 @@ This research project is a direct continuation of the work by [Darshan Thummar](
 ## Setting up the Cluster for Training (SLURM workload manager)
 ### Setup of Cluster Environment:
 
-Python libraries in cluster is installed by creating virtual environment as,
+Deposit this repository on the cluster using tools like rsync or any SFTP programm.
+
+
+Python libraries on cluster are installed by creating virtual environment:
 
 ```
 module load python/3.7 
 python3 -m pip install --user virtualenv 
 python3 -m virtualenv venv
-```
-
-Sync your repository with the cluster:
-
-```
-
 ```
 
 
@@ -33,7 +30,6 @@ To deactivate the virtual environment:
 ```
 deactivate
 ```
-
 
 
 To install the python libraries in venv virtual environment:
