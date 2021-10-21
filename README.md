@@ -6,7 +6,13 @@ This research project is a direct continuation of the work by [Darshan Thummar](
 ## Setting up the Cluster for Training (SLURM workload manager)
 ### Setup of Cluster Environment:
 
-Deposit this repository on the cluster using tools like rsync or any SFTP programm.
+Deposit this repository on the cluster using tools like [rsync](https://explainshell.com/explain?cmd=+rsync+-chavzP+--stats++%2Fpath%2Fto%2Flocal%2Fstorage++user%40remote.host%3A%2Fpath%2Fto%2Fcopy):
+
+```
+rsync -chavzP --stats /path/to/local/storage user@remote.host:/path/to/copy
+```
+
+or any other SFTP programm (e.g. [filezilla](https://filezilla-project.org/)).
 
 
 Python libraries on cluster are installed by creating virtual environment:
