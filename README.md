@@ -16,7 +16,7 @@ Any other SFTP programm (e.g. [filezilla](https://filezilla-project.org/)) will 
 If your want to get your files from the cluster back to your local machine just switch the source and destination path and append the option ```--exclude_from='exclude_file.txt'```:
 
 ```
-rsync -chavzP --stats --exclude_from='exclude_file.txt' user@remote.host:/path/to/copy /path/to/local/storage
+rsync -chavzP --stats --exclude-from='exclude_me.txt' user@remote.host:/path/to/copy /path/to/local/storage
 ```
 
 
