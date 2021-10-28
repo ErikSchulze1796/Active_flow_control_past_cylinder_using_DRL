@@ -71,7 +71,6 @@ module load singularity/3.6.0rc2
 singularity shell of_v2021.sif
 cd ~/DRL_py_beta/agentRotatingWallVelocity/
 wmake
-
 ```
 
 After following the steps the generated ```libAgentRotatingWallVelocity.so``` file hast to be copied/moved to the ```./DRL_py_beta/``` directory. The starting point is the ```./DRL_py_beta/agentRotatingWallVelocity/``` directory:
