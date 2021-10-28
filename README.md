@@ -62,6 +62,9 @@ cd run/cylinder2D_base
 # for execution for local OpenFOAM installation
 ./Allrun
 ```
+## Setting up openFOAM environment
+In order to start the simulations correctly you need to first build the openFOAM environment. This can be done using the ```README.MD``` in the ```./DRL_py_beta/agentRotatingWallVelocity/``` directory. After following the steps the generated ```libAgentRotatingWallVelocity.so``` file hast to be copied to the ```./DRL_py_beta/``` directory.
+
 
 ## Singularity and SLURM
 
