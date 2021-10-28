@@ -74,7 +74,7 @@ wmake
 
 ```
 
-After following the steps the generated ```libAgentRotatingWallVelocity.so``` file hast to be copied/moved to the ```./DRL_py_beta/``` directory:
+After following the steps the generated ```libAgentRotatingWallVelocity.so``` file hast to be copied/moved to the ```./DRL_py_beta/``` directory. The starting point is the ```./DRL_py_beta/agentRotatingWallVelocity/``` directory:
 ```
 mv ./libAgentRotatingWallVelocity.so ./..
 ```
