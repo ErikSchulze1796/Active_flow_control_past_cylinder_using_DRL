@@ -63,8 +63,21 @@ cd run/cylinder2D_base
 ./Allrun
 ```
 ## Setting up openFOAM environment
-In order to start the simulations correctly you need to first build the openFOAM environment. This can be done following the instructions in the ```README.MD``` in the ```./DRL_py_beta/agentRotatingWallVelocity/``` directory. After following the steps the generated ```libAgentRotatingWallVelocity.so``` file hast to be copied/moved to the ```./DRL_py_beta/``` directory.
+In order to start the simulations correctly you need to first build the openFOAM simulation environment. This can be done following the instructions in the ```README.MD``` in the ```./DRL_py_beta/agentRotatingWallVelocity/``` directory or you could just use the following commands.
+The starting point is the parent directory of ```./DRL_py_bet``` where the ```of_v2021.sif``` file should be located:
 
+```
+module load singularity/3.6.0rc2
+singularity shell of_v2021.sif
+cd ~/DRL_py_beta/agentRotatingWallVelocity/
+wmake
+
+```
+
+After following the steps the generated ```libAgentRotatingWallVelocity.so``` file hast to be copied/moved to the ```./DRL_py_beta/``` directory:
+```
+mv ./libAgentRotatingWallVelocity.so ./..
+```
 
 ## Singularity and SLURM
 
