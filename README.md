@@ -46,7 +46,7 @@ deactivate
 To install the python libraries in venv virtual environment:
 
 ```
-pip install -r ./DRL_py/docker/requirements.tx
+pip install -r ./DRL_py/docker/requirements.txt
 ```
 
 ## Getting started
