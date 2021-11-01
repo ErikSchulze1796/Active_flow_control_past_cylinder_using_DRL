@@ -63,13 +63,16 @@ cd run/cylinder2D_base
 ./Allrun
 ```
 ## Setting up openFOAM environment
-In order to start the simulations correctly you need to first build the openFOAM simulation environment. This can be done following the instructions in the ```README.MD``` in the ```./DRL_py_beta/agentRotatingWallVelocity/``` directory or you could just use the following commands.
+In order to start the simulations correctly you need to first build the openFOAM simulation environment. This can be done following the instructions in the [README.MD](https://github.com/ErikSchulze1796/Active_flow_control_past_cylinder_using_DRL/blob/main/DRL_py_beta/agentRotatingWallVelocity/README.md) in the ```./DRL_py_beta/agentRotatingWallVelocity/``` directory or you could just use the following commands.
 The starting point is the parent directory of ```./DRL_py_beta``` where the ```of_v2012.sif``` file should be located:
 
 ```
 module load singularity/3.6.0rc2
+# top level folder of repository
 singularity shell of_v2012.sif
-cd ./DRL_py_beta/agentRotatingWallVelocity/
+# now we are operating from inside the container
+source /usr/lib/openfoam/openfoam2012/etc/bashrc
+cd /DRL_py/agentRotatingWallVelocity/
 wmake
 ```
 
