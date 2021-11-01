@@ -46,7 +46,7 @@ deactivate
 To install the python libraries in venv virtual environment:
 
 ```
-pip install -r ./DRL_py/docker/requirements.tx
+pip install -r ./DRL_py/docker/requirements.txt
 ```
 
 ## Getting started
@@ -64,11 +64,11 @@ cd run/cylinder2D_base
 ```
 ## Setting up openFOAM environment
 In order to start the simulations correctly you need to first build the openFOAM simulation environment. This can be done following the instructions in the ```README.MD``` in the ```./DRL_py_beta/agentRotatingWallVelocity/``` directory or you could just use the following commands.
-The starting point is the parent directory of ```./DRL_py_bet``` where the ```of_v2021.sif``` file should be located:
+The starting point is the parent directory of ```./DRL_py_beta``` where the ```of_v2012.sif``` file should be located:
 
 ```
 module load singularity/3.6.0rc2
-singularity shell of_v2021.sif
+singularity shell of_v2012.sif
 cd ~/DRL_py_beta/agentRotatingWallVelocity/
 wmake
 ```
