@@ -69,7 +69,7 @@ The starting point is the parent directory of ```./DRL_py_bet``` where the ```of
 ```
 module load singularity/3.6.0rc2
 singularity shell of_v2012.sif
-cd ~/DRL_py_beta/agentRotatingWallVelocity/
+cd ./DRL_py_beta/agentRotatingWallVelocity/
 wmake
 ```
 
