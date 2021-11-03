@@ -2,7 +2,7 @@
 
 This research project is a direct continuation of the work by [Darshan Thummar](https://github.com/darshan315/flow_past_cylinder_by_DRL) and [Fabian Gabriel](https://github.com/FabianGabriel/Active_flow_control_past_cylinder_using_DRL).
 
-Running into trouble? Use the [wiki](https://github.com/ErikSchulze1796/Active_flow_control_past_cylinder_using_DRL/wiki) or open an issue an the [issues page](https://github.com/ErikSchulze1796/Active_flow_control_past_cylinder_using_DRL/issues).
+Running into trouble? Use the [wiki](https://github.com/ErikSchulze1796/Active_flow_control_past_cylinder_using_DRL/wiki) or open an issue on the [issues page](https://github.com/ErikSchulze1796/Active_flow_control_past_cylinder_using_DRL/issues).
 
 ## Setting up the Cluster for Training (SLURM workload manager)
 ### Setup of Cluster Environment:
