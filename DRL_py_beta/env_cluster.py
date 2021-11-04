@@ -138,7 +138,8 @@ touch finished.txt""")
         core_count = 4
 
         # get the random start
-        rand_control_traj = self.rand_n_to_contol(1)
+#        rand_control_traj = self.rand_n_to_contol(1)
+        rand_control_traj = self.get_random_control_start_time(100, self.control_between[0], self.control_between[1])
 
         # changing of end time to keep trajectory length equal
         endtime = round(float(rand_control_traj[0] + 2), 2)
