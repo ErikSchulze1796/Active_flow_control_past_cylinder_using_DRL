@@ -9,6 +9,9 @@ import os
 import queue
 import subprocess
 import time
+from glob import glob
+
+import torch
 
 import numpy as np
 
@@ -17,7 +20,7 @@ class env:
     """
         This Class is to run trajectory, hence handling OpenFOAM files and executing them in machine
     """
-    def __init__(self, n_worker, buffer_size, control_between):
+    def __init__(self, n_worker, buffer_size, control_between):#, simulation_re):
         """
 
         Args:
@@ -28,6 +31,7 @@ class env:
         self.n_worker = n_worker
         self.buffer_size = buffer_size
         self.control_between = control_between
+        #self.simulation_re = simulation_re
 
     def write_jobfile(self, core_count, job_name, file, job_dir):
         with open(f'{job_dir}/jobscript.sh', 'w') as rsh:
@@ -64,10 +68,53 @@ touch finished.txt""")
         n_rand = np.round(n_rand, 2)
         return n_rand
 
+    def get_snapshot_List(self, simulation_re=100):
+        """
+        Returns a list of snapshots for a simulation with a certain reynoldsnumber
+
+        Args:
+            simulation_re: The reynoldsnumber (Re) of th simulated flow. Default set to Re=100
+            start with, since the baseline data is organized by Re (e.g. Re=100)
+
+        Returns:
+            snapshotList: List of snapshots
+        """
+        # Make sure simultionRe is a string
+        if not isinstance(simulation_re, str):
+            simulation_re = str(simulation_re)
+
+        # Get a list of available baseline data snapshots belonging to a certain reynolds number
+        snapshotList = glob(f'*/env/base_case/baseline_data/Re_{simulation_re}/processor0/*.*/')
+        # Keep only the string with the time 
+        snapshotList = [float(path.split('/')[-2]) for path in snapshotList]
+
+        return torch.Tensor(snapshotList)
+
+    def get_random_control_start_time(self, simulation_re=100, lowerThreshold=None, upperThreshold=None):
+        """
+        Returns a random start time which is drawn from the base line data snapshots
+
+        Args:
+            simulation_re: Contains the reynolds number (Re) of th simulated flow. Default set to Re=100
+            lowerThreshold: Contains the lower time threshold for when to start control
+            upperThreshold: Contains the upper time threshold for when to start control
+
+        Returns:
+            startTime: Returns a start time corresponding to the randomly selected index
+            index: Returns the index of the randomly chosen point in time
+        """
+        # Get baseline data snapshots for given reynolds number
+        snapshotList = self.get_snapshot_List(simulation_re)
+        index = torch.multinomial(snapshotList, 1)
+
+        startTime = snapshotList[index]
+
+        return startTime, index
+
     def process_waiter(self, proc, job_name, que):
         """
              This method is to wait for the executed process till it is completed
-         """
+        """
         try:
             proc.wait()
         finally:
@@ -104,7 +151,7 @@ touch finished.txt""")
 
         zeros = '.2f'
         time_string = f"{rand_control_traj[0]:,{zeros}}"
-        # copy files form base_case
+        # copy files from base_case
         # change starting time of control -> 0.org/U && system/controlDict
         # change of ending time -> system/controlDict
         os.popen(f'cp -r ./env/base_case/agentRotatingWallVelocity/* {traj_path}/ && '
@@ -141,7 +188,7 @@ touch finished.txt""")
         Returns: execution of n number of trajectory (n = buffer_size)
 
         """
-        # set the counter to count the numbre of trajectory
+        # set the counter to count the number of trajectory
         buffer_counter = 0
 
         # list for the status of trajectory running or finished
@@ -179,5 +226,5 @@ if __name__ == "__main__":
     buffer_size = 4
     control_between = [0.1, 4]
     sample = 0
-    env = env(n_worker, buffer_size, control_between)
+    env = env(n_worker, buffer_size, control_between, 100)
     env.sample_trajectories(sample)
