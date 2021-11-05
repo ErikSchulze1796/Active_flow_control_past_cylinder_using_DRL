@@ -68,6 +68,11 @@ touch finished.txt""")
         n_rand = np.round(n_rand, 2)
         return n_rand
 
+    def remove_tensor_element(self, tensor, indices):
+        mask = torch.ones(tensor.numel(), dtype=torch.bool)
+        mask[indices] = False
+        return tensor[mask]
+
     def get_snapshot_List(self, simulation_re=100):
         """
         Returns a list of snapshots for a simulation with a certain reynoldsnumber
@@ -87,27 +92,42 @@ touch finished.txt""")
         snapshotList = glob(f'*/env/base_case/baseline_data/Re_{simulation_re}/processor0/*.*/')
         # Keep only the string with the time 
         snapshotList = [float(path.split('/')[-2]) for path in snapshotList]
-
+        snapshotList.sort()
         return torch.Tensor(snapshotList)
 
-    def get_random_control_start_time(self, simulation_re=100, lowerThreshold=None, upperThreshold=None):
+    def get_random_control_start_time(self, lowerControlThreshold=None, upperControlThreshold=None, simulation_re=100):
         """
-        Returns a random start time which is drawn from the base line data snapshots
+        Returns a random start time which is drawn from the base line data snapshots. Time boundaries can
+        be set if necessary. The boundaries are not inclusive.
 
         Args:
             simulation_re: Contains the reynolds number (Re) of th simulated flow. Default set to Re=100
-            lowerThreshold: Contains the lower time threshold for when to start control
-            upperThreshold: Contains the upper time threshold for when to start control
+            lowerControlThreshold: Contains the lower time threshold for when to start control
+            upperControlThreshold: Contains the upper time threshold for when to start control
 
         Returns:
             startTime: Returns a start time corresponding to the randomly selected index
             index: Returns the index of the randomly chosen point in time
         """
         # Get baseline data snapshots for given reynolds number
-        snapshotList = self.get_snapshot_List(simulation_re)
-        index = torch.multinomial(snapshotList, 1)
+        snapshotList = self.get_snapshot_List(simulation_re).tolist()
 
-        startTime = snapshotList[index]
+        # Remove snapshots from list if thresholds apply
+        if (lowerControlThreshold is not None) and (upperControlThreshold is None):
+            new_snapshotList = [snapshot for snapshot in snapshotList if snapshot > lowerControlThreshold]
+            print(new_snapshotList)
+
+        elif (lowerControlThreshold is None) and (upperControlThreshold is not None):
+            new_snapshotList = [snapshot for snapshot in snapshotList if snapshot < upperControlThreshold]
+            print(new_snapshotList)
+
+        elif (lowerControlThreshold is not None) and (upperControlThreshold is not None):
+            new_snapshotList = [snapshot for snapshot in snapshotList if (snapshot > lowerControlThreshold) and (snapshot < upperControlThreshold)]
+            print(new_snapshotList)
+
+        index = torch.multinomial(torch.Tensor(new_snapshotList), 1)
+
+        startTime = new_snapshotList[index]
 
         return startTime, index
 
@@ -227,5 +247,5 @@ if __name__ == "__main__":
     buffer_size = 4
     control_between = [0.1, 4]
     sample = 0
-    env = env(n_worker, buffer_size, control_between, 100)
+    env = env(n_worker, buffer_size, control_between)
     env.sample_trajectories(sample)
