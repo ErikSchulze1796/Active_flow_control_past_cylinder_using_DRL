@@ -115,15 +115,12 @@ touch finished.txt""")
         # Remove snapshots from list if thresholds apply
         if (lowerControlThreshold is not None) and (upperControlThreshold is None):
             new_snapshotList = [snapshot for snapshot in snapshotList if snapshot > lowerControlThreshold]
-            print(new_snapshotList)
 
         elif (lowerControlThreshold is None) and (upperControlThreshold is not None):
             new_snapshotList = [snapshot for snapshot in snapshotList if snapshot < upperControlThreshold]
-            print(new_snapshotList)
 
         elif (lowerControlThreshold is not None) and (upperControlThreshold is not None):
             new_snapshotList = [snapshot for snapshot in snapshotList if (snapshot > lowerControlThreshold) and (snapshot < upperControlThreshold)]
-            print(new_snapshotList)
 
         index = torch.multinomial(torch.Tensor(new_snapshotList), 1)
 
