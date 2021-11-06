@@ -25,8 +25,7 @@ def get_snapshot_List(simulation_re=100):
     # Get a list of available baseline data snapshots belonging to a certain reynolds number
                 #DRL_py_beta/env/base_case/baseline_data/Re_{simulation_re}/processor0
 
-    baseline_path = f'**/DRL_py_beta/env/base_case/baseline_data/Re_{simulation_re}/processor0/*/'
-    print(baseline_path)
+    baseline_path = f'./env/base_case/baseline_data/Re_{simulation_re}/processor0/*/'
     snapshotList = glob(baseline_path, recursive=True)
     # Check if list contains something and raise exception if it is empty
     if not snapshotList:
@@ -37,7 +36,7 @@ def get_snapshot_List(simulation_re=100):
     snapshotList = sorted(snapshotList)
     return snapshotList
 
-def get_random_control_start_time(lowerControlThreshold=None, upperControlThreshold=None, simulation_re=100):
+def get_random_control_start_time(simulation_re=100, lowerControlThreshold=None, upperControlThreshold=None):
     """
     Returns a random start time which is drawn from the base line data snapshots. Time boundaries can
     be set if necessary. The boundaries are not inclusive.
