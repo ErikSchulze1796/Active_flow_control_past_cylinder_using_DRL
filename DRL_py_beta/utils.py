@@ -9,7 +9,6 @@ import torch
 from exceptions import ReturnedEmptyError
 
 
-
 def get_snapshot_List(simulation_re=100):
     """
     Returns a list of snapshots for a simulation with a certain reynoldsnumber
@@ -51,7 +50,6 @@ def get_random_control_start_time(simulation_re=100, lowerControlThreshold=None,
     # Get baseline data snapshots for given reynolds number
     snapshotList = get_snapshot_List(simulation_re)
     snapshotList = [float(snapshot) for snapshot in snapshotList]
-    print(snapshotList)
     # Remove snapshots from list if thresholds apply
     if (lowerControlThreshold is not None) and (upperControlThreshold is None):
         new_snapshotList = [snapshot for snapshot in snapshotList if snapshot > lowerControlThreshold]

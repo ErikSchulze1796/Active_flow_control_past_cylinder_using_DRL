@@ -35,7 +35,7 @@ n_worker = 12
 # no of total buffer size
 buffer_size = 10
 # range to randomly start control
-control_between = [4.5, 4.9]
+control_between = [2.5, 4.0]
 # env instance
 env = env(n_worker, buffer_size, control_between)
 
