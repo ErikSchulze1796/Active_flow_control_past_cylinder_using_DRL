@@ -15,7 +15,7 @@ import torch
 import numpy as np
 
 # Custom classes
-import utils
+import utils as utils
 
 
 class env:
