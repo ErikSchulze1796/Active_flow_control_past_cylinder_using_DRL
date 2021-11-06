@@ -26,7 +26,7 @@ def get_snapshot_List(simulation_re=100):
                 #DRL_py_beta/env/base_case/baseline_data/Re_{simulation_re}/processor0
 
     baseline_path = f"env/base_case/baseline_data/Re_{simulation_re}/processor0/*/"
-    snapshotList = glob(baseline_path, recursive=True)#
+    snapshotList = glob(baseline_path)#
     # Check if list contains something and raise exception if it is empty
     if not snapshotList:
         raise ReturnedEmptyError("The snapshot list is empty.")
