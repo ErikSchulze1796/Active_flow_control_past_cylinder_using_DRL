@@ -9,7 +9,6 @@ import os
 import queue
 import subprocess
 import time
-from glob import glob
 
 import torch
 
@@ -68,68 +67,6 @@ touch finished.txt""")
         n_rand = np.round(n_rand, 2)
         return n_rand
 
-    def remove_tensor_element(self, tensor, indices):
-        mask = torch.ones(tensor.numel(), dtype=torch.bool)
-        mask[indices] = False
-        return tensor[mask]
-
-    def get_snapshot_List(self, simulation_re=100):
-        """
-        Returns a list of snapshots for a simulation with a certain reynoldsnumber
-
-        Args:
-            simulation_re: The reynoldsnumber (Re) of th simulated flow. Default set to Re=100
-            start with, since the baseline data is organized by Re (e.g. Re=100)
-
-        Returns:
-            snapshotList: List of snapshots
-        """
-        # Make sure simultionRe is a string
-        if not isinstance(simulation_re, str):
-            simulation_re = str(simulation_re)
-
-        # Get a list of available baseline data snapshots belonging to a certain reynolds number
-        snapshotList = glob(f'*/env/base_case/baseline_data/Re_{simulation_re}/processor0/*.*/')
-        # Keep only the string with the time 
-        snapshotList = [float(path.split('/')[-2]) for path in snapshotList]
-        snapshotList.sort()
-        return torch.Tensor(snapshotList)
-
-    def get_random_control_start_time(self, lowerControlThreshold=None, upperControlThreshold=None, simulation_re=100):
-        """
-        Returns a random start time which is drawn from the base line data snapshots. Time boundaries can
-        be set if necessary. The boundaries are not inclusive.
-
-        Args:
-            simulation_re: Contains the reynolds number (Re) of th simulated flow. Default set to Re=100
-            lowerControlThreshold: Contains the lower time threshold for when to start control
-            upperControlThreshold: Contains the upper time threshold for when to start control
-
-        Returns:
-            startTime: Returns a start time corresponding to the randomly selected index
-            index: Returns the index of the randomly chosen point in time
-        """
-        # Get baseline data snapshots for given reynolds number
-        snapshotList = self.get_snapshot_List(simulation_re).tolist()
-        print(snapshotList)
-
-        # Remove snapshots from list if thresholds apply
-        if (lowerControlThreshold is not None) and (upperControlThreshold is None):
-            new_snapshotList = [snapshot for snapshot in snapshotList if snapshot > lowerControlThreshold]
-
-        elif (lowerControlThreshold is None) and (upperControlThreshold is not None):
-            new_snapshotList = [snapshot for snapshot in snapshotList if snapshot < upperControlThreshold]
-
-        elif (lowerControlThreshold is not None) and (upperControlThreshold is not None):
-            new_snapshotList = [snapshot for snapshot in snapshotList if (snapshot > lowerControlThreshold) and (snapshot < upperControlThreshold)]
-
-        print(new_snapshotList)
-        index = torch.multinomial(torch.Tensor(new_snapshotList), 1)
-
-        startTime = new_snapshotList[index]
-
-        return startTime, index
-
     def process_waiter(self, proc, job_name, que):
         """
              This method is to wait for the executed process till it is completed
@@ -158,7 +95,7 @@ touch finished.txt""")
 
         # get the random start
 #        rand_control_traj = self.rand_n_to_contol(1)
-        rand_control_traj = self.get_random_control_start_time(100, self.control_between[0], self.control_between[1])
+        rand_control_traj = utils.get_random_control_start_time(100, self.control_between[0], self.control_between[1])
 
         # changing of end time to keep trajectory length equal
         endtime = round(float(rand_control_traj[0] + 2), 2)
