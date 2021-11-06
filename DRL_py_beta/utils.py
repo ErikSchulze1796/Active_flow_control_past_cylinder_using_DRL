@@ -1,7 +1,7 @@
 """
 This file contains the utils class which provides some general utility functions for working with the DRL directory
 """
-
+import os
 from glob import glob
 
 import torch
@@ -24,6 +24,9 @@ def get_snapshot_List(simulation_re=100):
         simulation_re = str(simulation_re)
     # Get a list of available baseline data snapshots belonging to a certain reynolds number
                 #DRL_py_beta/env/base_case/baseline_data/Re_{simulation_re}/processor0
+
+    path = os.getcwd()
+    print(path)
     baseline_path = f"./DRL_py_beta/env/base_case/baseline_data/Re_{simulation_re}/processor0/*/"
     snapshotList = glob(baseline_path, recursive=True)#
     # Check if list contains something and raise exception if it is empty
