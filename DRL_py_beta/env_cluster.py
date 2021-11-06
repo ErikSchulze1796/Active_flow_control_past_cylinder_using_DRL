@@ -111,6 +111,7 @@ touch finished.txt""")
         """
         # Get baseline data snapshots for given reynolds number
         snapshotList = self.get_snapshot_List(simulation_re).tolist()
+        print(snapshotList)
 
         # Remove snapshots from list if thresholds apply
         if (lowerControlThreshold is not None) and (upperControlThreshold is None):
@@ -122,6 +123,7 @@ touch finished.txt""")
         elif (lowerControlThreshold is not None) and (upperControlThreshold is not None):
             new_snapshotList = [snapshot for snapshot in snapshotList if (snapshot > lowerControlThreshold) and (snapshot < upperControlThreshold)]
 
+        print(new_snapshotList)
         index = torch.multinomial(torch.Tensor(new_snapshotList), 1)
 
         startTime = new_snapshotList[index]
