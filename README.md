@@ -21,7 +21,7 @@ rsync -chavzP --stats --exclude-from='exclude_me.txt' user@remote.host:/path/to/
 ```
 
 
-Python libraries on cluster are installed by creating virtual environment:
+Python libraries on cluster are installed by creating a virtual environment. The current implementation requires the ```venv``` folder to be located inside the home directory, when working on the cluster. Otherwise the required libraries might not be found by the scripts:
 
 ```
 module load python/3.7 

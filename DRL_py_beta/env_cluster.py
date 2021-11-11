@@ -10,14 +10,19 @@ import queue
 import subprocess
 import time
 
+import torch
+
 import numpy as np
+
+# Custom classes
+import utils
 
 
 class env:
     """
         This Class is to run trajectory, hence handling OpenFOAM files and executing them in machine
     """
-    def __init__(self, n_worker, buffer_size, control_between):
+    def __init__(self, n_worker, buffer_size, control_between):#, simulation_re):
         """
 
         Args:
@@ -28,6 +33,7 @@ class env:
         self.n_worker = n_worker
         self.buffer_size = buffer_size
         self.control_between = control_between
+        #self.simulation_re = simulation_re
 
     def write_jobfile(self, core_count, job_name, file, job_dir):
         with open(f'{job_dir}/jobscript.sh', 'w') as rsh:
@@ -67,7 +73,7 @@ touch finished.txt""")
     def process_waiter(self, proc, job_name, que):
         """
              This method is to wait for the executed process till it is completed
-         """
+        """
         try:
             proc.wait()
         finally:
@@ -91,7 +97,8 @@ touch finished.txt""")
         core_count = 4
 
         # get the random start
-        rand_control_traj = self.rand_n_to_contol(1)
+#        rand_control_traj = self.rand_n_to_contol(1)
+        rand_control_traj = utils.get_random_control_start_time(100, self.control_between[0], self.control_between[1])
 
         # changing of end time to keep trajectory length equal
         endtime = round(float(rand_control_traj[0] + 2), 2)
@@ -104,7 +111,7 @@ touch finished.txt""")
 
         zeros = '.2f'
         time_string = f"{rand_control_traj[0]:,{zeros}}"
-        # copy files form base_case
+        # copy files from base_case
         # change starting time of control -> 0.org/U && system/controlDict
         # change of ending time -> system/controlDict
         os.popen(f'cp -r ./env/base_case/agentRotatingWallVelocity/* {traj_path}/ && '
@@ -141,7 +148,7 @@ touch finished.txt""")
         Returns: execution of n number of trajectory (n = buffer_size)
 
         """
-        # set the counter to count the numbre of trajectory
+        # set the counter to count the number of trajectory
         buffer_counter = 0
 
         # list for the status of trajectory running or finished
