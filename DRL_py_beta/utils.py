@@ -1,7 +1,6 @@
 """
 This file contains the utils class which provides some general utility functions for working with the DRL directory
 """
-import os
 from glob import glob
 
 import torch
@@ -28,7 +27,7 @@ def get_snapshot_List(simulation_re=100):
     snapshotList = glob(baseline_path, recursive=True)
     # Check if list contains something and raise exception if it is empty
     if not snapshotList:
-        raise ReturnedEmptyError("The snapshot list is empty.")
+        raise ValueError("The snapshot list is empty.")
     # Keep only the part of the strings containing the physical simulatio time
     snapshotList = [path.split('/')[-2] for path in snapshotList]
     snapshotList.remove("constant")
@@ -57,10 +56,15 @@ def get_random_control_start_time(simulation_re=100, lowerControlThreshold=None,
         new_snapshotList = [snapshot for snapshot in snapshotList if snapshot < upperControlThreshold]
     elif (lowerControlThreshold is not None) and (upperControlThreshold is not None):
         new_snapshotList = [snapshot for snapshot in snapshotList if (snapshot > lowerControlThreshold) and (snapshot < upperControlThreshold)]
+    else:
+        new_snapshotList = snapshotList
 
-        print(new_snapshotList)
-        index = torch.multinomial(torch.Tensor(new_snapshotList), 1)
+    n_snapshots = len(new_snapshotList)
+    # Seed the random number generator for reproducibility
+    torch.manual_seed(0)
+    # Draw randomly from snapshots
+    index = torch.multinomial(torch.ones(n_snapshots), 1)
 
-        startTime = new_snapshotList[index]
+    startTime = new_snapshotList[index]
 
-        return startTime, index
+    return startTime, index
