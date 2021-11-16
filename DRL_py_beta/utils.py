@@ -60,8 +60,7 @@ def get_random_control_start_time(simulation_re=100, lowerControlThreshold=None,
         new_snapshotList = snapshotList
 
     n_snapshots = len(new_snapshotList)
-    # Seed the random number generator for reproducibility
-    torch.manual_seed(0)
+
     # Draw randomly from snapshots
     index = torch.multinomial(torch.ones(n_snapshots), 1)
 

@@ -6,6 +6,9 @@ import torch.optim as optim
 from ppo import *
 from network import *
 
+# Seed the random number generator for reproducibility
+torch.manual_seed(0)
+
 # tolerance for std
 EPS = 1e-6
 
