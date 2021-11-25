@@ -5,8 +5,6 @@ from glob import glob
 
 import torch
 
-from exceptions import ReturnedEmptyError
-
 
 def get_snapshot_List(simulation_re=100):
     """
