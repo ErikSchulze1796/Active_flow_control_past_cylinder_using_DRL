@@ -1,14 +1,38 @@
+from datetime import time
 import torch as pt
 
 import numpy as np
 
 from matplotlib import pyplot as plt
 
-def plot_loss(train_loss, val_loss, loss_type: str(), lr: float(), save_plots_in: str(), show: bool=False):
+def plot_loss(train_loss, val_loss, loss_type: str, lr: float, n_neurons: int, n_layers: int, n_steps_history: int, save_plots_in: str, show: bool=False):
+    """Plots training and validation loss
+
+    Parameters
+    ----------
+    train_loss : list(float)
+        List of average training loss per epoch
+    val_loss : list(float)
+        List of average validation loss per epoch
+    loss_type : str
+        Loss type (e.g. MSE, MAE, MCE)
+    lr : float
+        Learning rate
+    n_neurons : int
+        Number of neurons
+    n_layers : int
+        Number of layers
+    n_steps_history : int
+        Number of time steps being included in the feature vector
+    save_plots_in : str
+        Path to save the figure to
+    show : bool, optional
+        Flag for showing the plot, by default False
+    """
     epochs = len(train_loss)
     
     fig, ax = plt.subplots()
-    ax.set_title(r"Epoch vs. {} loss; Learning rate = {}".format(loss_type, lr))
+    ax.set_title(r"Epoch vs. {} loss; Learning rate = {}; neurons={}; layers={}; steps={}".format(loss_type, lr, n_neurons, n_layers, n_steps_history))
     ax.plot(range(1, epochs+1), train_loss, lw=1.0, label="training loss")
     ax.plot(range(1, epochs+1), val_loss, lw=1.0, label="validation loss")
     ax.set_xlabel("epoch")
@@ -18,14 +42,39 @@ def plot_loss(train_loss, val_loss, loss_type: str(), lr: float(), save_plots_in
     fig.legend()
     if show:
         fig.show()
-    fig.savefig(f"{save_plots_in}/train_val_loss_lr{lr}.svg", bbox_inches="tight")
+    fig.savefig(f"{save_plots_in}/train_val_loss_lr{lr}_neurons{n_neurons}_nlayers{n_layers}_nhistory{n_steps_history}.svg", bbox_inches="tight")
 
-def plot_coefficient_prediction(time_steps, reference, prediction, y_label: str(), save_plots_in: str(), lr: float()):
-    assert reference.shape == prediction.shape, "Dimensions of <reference> and <prediction> are not matching"
-    assert reference.shape == time_steps.shape, "Dimensions of <reference> and <time_steps> are not matching"
+def plot_coefficient_prediction(time_steps, reference, prediction, y_label: str,
+                                save_plots_in: str, lr: float, n_neurons: int, 
+                                n_layers: int, n_steps_history: int):
+    """Plots c_D and c_L coefficient predictions in comparison to reference
+
+    Parameters
+    ----------
+    time_steps : numpy.ndarray
+        Contains the time steps for each state
+    reference : numpy.ndarray
+        Reference c_D or c_L value
+    prediction : torch.Tensor
+        Model predictions
+    y_label : str
+        Label for the y axis
+    save_plots_in : str
+        Path to save the figure to
+    lr : float
+        Learning rate
+    n_neurons : int
+        Number of neurons
+    n_layers : int
+        Number of layers
+    n_steps_history : int
+        Number of time steps being included in the feature vector
+    """
+    assert reference.shape == prediction.shape, f"Dimensions of <reference> ({reference}) and <prediction> ({prediction}) are not matching"
+    assert reference.shape == time_steps.shape, f"Dimensions of <reference> ({reference}) and <time_steps> ({time_steps}) are not matching"
 
     fig, ax = plt.subplots()
-    ax.set_title(r"Time vs. ${}$; Learning rate = {}".format(y_label, lr))
+    ax.set_title(r"Time vs. ${}$; Learning rate = {}; neurons={}; layers={}; steps={}".format(y_label, lr, n_neurons, n_layers, n_steps_history))
     ax.plot([], label="reference", c="k")
     ax.plot([], label="prediction", c="C3", ls="--")
     ax.plot(time_steps, reference, c="k")
@@ -34,15 +83,6 @@ def plot_coefficient_prediction(time_steps, reference, prediction, y_label: str(
     ax.set_ylabel(r"${}$".format(y_label))
     ax.set_xlim(0.0, max(time_steps))
     ax.set_xticks(np.arange(0.0, round(max(time_steps)+1), 1.0))
-    
-    # y_max = max(reference)
-    # y_min = min(reference)
-    # # Set min max values for y axis scaling
-    # if min(prediction) < y_min:
-    #     y_min = min(prediction)
-    # if max(prediction) > y_max:
-    #     y_max = max(prediction)
-        
-    # plt.ylim(y_min, y_max)
+
     fig.legend(loc="upper center", ncol=2, bbox_to_anchor=[0.5, 1.12])
-    fig.savefig(f"{save_plots_in}/{y_label}_coefficient_pred_vs_org_lr{lr}.svg", bbox_inches="tight")
+    fig.savefig(f"{save_plots_in}/{y_label}_coefficient_pred_vs_org_lr{lr}_neurons{n_neurons}_nlayers{n_layers}_nhistory{n_steps_history}.svg", bbox_inches="tight")
