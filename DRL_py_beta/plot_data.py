@@ -85,4 +85,22 @@ def plot_coefficient_prediction(time_steps, reference, prediction, y_label: str,
     ax.set_xticks(np.arange(0.0, round(max(time_steps)+1), 1.0))
 
     fig.legend(loc="upper center", ncol=2, bbox_to_anchor=[0.5, 1.12])
+    fig.show()
     fig.savefig(f"{save_plots_in}/{y_label}_coefficient_pred_vs_org_lr{lr}_neurons{n_neurons}_nlayers{n_layers}_nhistory{n_steps_history}.svg", bbox_inches="tight")
+
+def plot_feature_space_error_map(time_steps, reference, prediction, save_plots_in: str,
+                                lr, n_neurons, n_layers, n_steps_history):
+    
+    # error = pt.transpose((prediction - reference), 0, 1)
+    error = pt.transpose(((reference - prediction) / reference).abs(), 0, 1)
+    
+    sensors = pt.linspace(1, 400, 400)
+    
+    fig, ax = plt.subplots()
+    pcol = plt.pcolormesh(time_steps, sensors, error.abs(), shading='auto')
+    fig.colorbar(pcol, label=r"absolute error")
+    ax.set_xlabel(r"t [s]")
+    ax.set_ylabel(r"Sensor")
+    fig.show()
+    fig.savefig(f"{save_plots_in}/pressure_error_time_heatmap_lr{lr}_neurons{n_neurons}_nlayers{n_layers}_nhistory{n_steps_history}.png", bbox_inches="tight")
+    
