@@ -70,8 +70,8 @@ def plot_coefficient_prediction(time_steps, reference, prediction, y_label: str,
     n_steps_history : int
         Number of time steps being included in the feature vector
     """
-    assert reference.shape == prediction.shape, f"Dimensions of <reference> ({reference}) and <prediction> ({prediction}) are not matching"
-    assert reference.shape == time_steps.shape, f"Dimensions of <reference> ({reference}) and <time_steps> ({time_steps}) are not matching"
+    assert reference.shape == prediction.shape, f"Dimensions of <reference> ({reference.shape}) and <prediction> ({prediction.shape}) are not matching"
+    assert reference.shape == time_steps.shape, f"Dimensions of <reference> ({reference.shape}) and <time_steps> ({time_steps.shape}) are not matching"
 
     fig, ax = plt.subplots()
     ax.set_title(r"Time vs. ${}$; Learning rate = {}; neurons={}; layers={}; steps={}".format(y_label, lr, n_neurons, n_layers, n_steps_history))
@@ -91,16 +91,45 @@ def plot_coefficient_prediction(time_steps, reference, prediction, y_label: str,
 def plot_feature_space_error_map(time_steps, reference, prediction, save_plots_in: str,
                                 lr, n_neurons, n_layers, n_steps_history):
     
-    # error = pt.transpose((prediction - reference), 0, 1)
-    error = pt.transpose(((reference - prediction) / reference).abs(), 0, 1)
+    error_rel = pt.transpose(((reference - prediction) / 2).abs(), 0, 1)
     
     sensors = pt.linspace(1, 400, 400)
     
     fig, ax = plt.subplots()
-    pcol = plt.pcolormesh(time_steps, sensors, error.abs(), shading='auto')
-    fig.colorbar(pcol, label=r"absolute error")
+    fig.suptitle("Relative Error vs. Sensor vs. Time Heatmap")
+    pcol = plt.pcolormesh(time_steps, sensors, error_rel, shading='auto')
+    fig.colorbar(pcol, label=r"relative error")
     ax.set_xlabel(r"t [s]")
     ax.set_ylabel(r"Sensor")
-    fig.show()
-    fig.savefig(f"{save_plots_in}/pressure_error_time_heatmap_lr{lr}_neurons{n_neurons}_nlayers{n_layers}_nhistory{n_steps_history}.png", bbox_inches="tight")
+    # fig.show()
+    fig.savefig(f"{save_plots_in}/relative_pressure_error_time_heatmap_lr{lr}_neurons{n_neurons}_nlayers{n_layers}_nhistory{n_steps_history}.png", bbox_inches="tight")
+
+def plot_evaluation(time_steps, labels_cd, prediction_cd, labels_cl, prediction_cl, test_loss_l2, test_loss_lmax, r2score, save_model_in: str, lr: float, neurons: int, hidden_layers: int, n_steps_history: int):
+
+    fig, ax = plt.subplots(5,1)
+    fig.suptitle(f"FFNN, lr={lr}, neurons={neurons}, layers={hidden_layers}, steps={n_steps_history}")
+    ax[0].plot(time_steps, test_loss_l2, linewidth=1.0)
+    ax[1].plot(time_steps, test_loss_lmax, linewidth=1.0)
+    ax[2].plot(time_steps, r2score, linewidth=1.0)
+    ax[3].plot(time_steps, prediction_cd, label="prediction", c="C3", ls="--", linewidth=1.0)
+    ax[3].plot(time_steps, labels_cd, label="reference", c="k", linewidth=1.0)
+    ax[4].plot(time_steps, prediction_cl, label="prediction", c="C3", ls="--", linewidth=1.0)
+    ax[4].plot(time_steps, labels_cl, label="reference", c="k", linewidth=1.0)
     
+    ax[4].set_xlabel("Time [s]")
+    
+    ax[4].get_shared_x_axes().join(ax[0], ax[1], ax[2], ax[3], ax[4])
+    ax[0].set_xticklabels([])
+    ax[1].set_xticklabels([])
+    ax[2].set_xticklabels([])
+    ax[3].set_xticklabels([])
+
+    ax[0].set_ylabel("L2 loss")
+    ax[1].set_ylabel("Lmax loss")
+    ax[2].set_ylabel("R² Score")
+    ax[3].set_ylabel(r"$c_D$")
+    ax[4].set_ylabel(r"$c_L$")
+    
+    fig.legend(loc="upper right")
+    fig.tight_layout()
+    fig.savefig(f"{save_model_in}/evalutation_lr{lr}_neurons{neurons}_nlayers{hidden_layers}_nhistory{n_steps_history}.svg", bbox_inches="tight")
