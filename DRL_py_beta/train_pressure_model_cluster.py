@@ -471,7 +471,7 @@ def main():
     # Seeding
     pt.manual_seed(0)
 
-    location = "DRL_py_beta/training_pressure_model/initial_trajectories/initial_trajectory_data_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
+    location = "training_pressure_model/initial_trajectories/initial_trajectory_data_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
     data_total = pt.load(location)
     
     # Grid search set, up
