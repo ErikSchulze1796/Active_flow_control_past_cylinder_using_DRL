@@ -538,7 +538,7 @@ def main():
 
                     model = FFMLP(**model_params)
                     epochs = 10000
-                    save_model_in = f"DRL_py_beta/training_pressure_model/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{every_nth_element}/"
+                    save_model_in = f"training_pressure_model/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{every_nth_element}/"
                     if not isdir(save_model_in):
                         os.mkdir(save_model_in)
                     
