@@ -493,11 +493,11 @@ def main():
                 for n_steps_history in steps_space:
 
                     # Draw randomly k sample trajectories from all data
-                    perm = torch.randperm(data_total.size(0))
-                    k = 30
-                    idx = perm[:k]
-                    samples = data_total[idx]
-                    data = samples
+                    # perm = torch.randperm(data_total.size(0))
+                    # k = 30
+                    # idx = perm[:k]
+                    # samples = data_total[idx]
+                    # data = samples
                     
                     data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
                     data_labeled = generate_labeled_data(data_norm, n_steps_history, every_nth_element)
