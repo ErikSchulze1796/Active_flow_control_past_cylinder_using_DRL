@@ -3,15 +3,11 @@ This file contains the setup and trainin procedures
 for the MLP pressure prediction model
 """
 
-from glob import glob
-from array import array
 from typing import List, Tuple
 from os.path import isdir
-from scipy.stats.stats import variation
+import datetime
 
 import torch as pt
-
-import numpy as np
 
 from sklearn.metrics import r2_score
 
@@ -68,56 +64,44 @@ def optimize_model(model: pt.nn.Module, features_train: pt.Tensor, labels_train:
     for e in range(1, epochs+1):
         acc_loss_train = 0.0
         
+        # Randomize batch sample drawing
         permutation = torch.randperm(features_train.shape[0])
         n_batches = features_train.shape[0] / batch_size
         
+        # Batch loop
+        start = datetime.datetime.now()
         for i in range(0, features_train.shape[0], batch_size):
-            optimizer.zero_grad()
+            # Make sure all training samples are used at least and maximal once
             indices = permutation[i:i+batch_size]
             batch_feature_train, batch_label_train = features_train[indices], labels_train[indices]
-            
-            prediction = model(batch_feature_train)
+
+            optimizer.zero_grad()
+
+            # Forward + backward + optimize
+            prediction = model(batch_feature_train).squeeze()
             loss = criterion(prediction, batch_label_train)
-            acc_loss_train += loss.item()
-            
             loss.backward()
             optimizer.step()
-        
-        train_loss.append(acc_loss_train / n_batches)# / batch_size) # (features_train.shape[0] / 
+            acc_loss_train += loss.item()
 
-        acc_loss_val = 0.0
+        end = datetime.datetime.now()
+        train_time = (end-start).total_seconds()
+        # Divide loss by batch size to get average epoch loss
+        train_loss.append(acc_loss_train / n_batches)
+
+        # Validation
+        start = datetime.datetime.now()
         with pt.no_grad():
-            for i in range(0,features_val.shape[0]):
-                prediction = model(features_val)
-                loss = criterion(prediction, labels_val)
-                acc_loss_val += loss.item()
-        acc_loss_val = acc_loss_val / features_val.shape[0]
-        val_loss.append(loss)
-        
-        # acc_loss = 0.0
-        # for i, traj in enumerate(features_train):
-        #     optimizer.zero_grad()
-        #     prediction = model(traj).squeeze()
-
-        #     # Calculate loss
-        #     loss = criterion(prediction, labels_train[i])
-        #     acc_loss += loss.item()
-        #     loss.backward()
-        #     optimizer.step()
-        
-        # train_loss.append(acc_loss / features_train.shape[0])
+            prediction = model(features_val).squeeze()
+            loss = criterion(prediction, labels_val)
+            val_loss.append(loss.item())
             
-        # acc_loss = 0.0
-        # for i, traj in enumerate(features_val):
-        #     with pt.no_grad():
-
-        #         prediction = model(traj).squeeze()
-        #         loss = criterion(prediction, labels_val[i])
-        #         acc_loss += loss.item()
-        # val_loss.append(acc_loss / features_val.shape[0])
-
-        print("\r", "Training/validation loss epoch {:5d}: {:10.5e}, {:10.5e}".format(e, train_loss[-1], val_loss[-1]))#, end="")
+        end = datetime.datetime.now()
+        val_time = (end-start).total_seconds()
         
+        print("\r", "Training/validation loss epoch {:5d}: {:10.5e}, {:10.5e}; t_train {:2.5f}, t_val {:2.5f}".format(e, train_loss[-1], val_loss[-1], train_time, val_time), end="\r")
+        
+        # Save train and validation models to designated directory
         if isdir(save_best):
             if train_loss[-1] < best_train_loss:
                 pt.save(model.state_dict(), f"{save_best}best_model_train_{lr}_n_history{n_steps_history}_neurons{n_neurons}_layers{n_layers}.pt")
@@ -126,19 +110,39 @@ def optimize_model(model: pt.nn.Module, features_train: pt.Tensor, labels_train:
             if val_loss[-1] < best_val_loss:
                 pt.save(model.state_dict(), f"{save_best}best_model_val_{lr}_n_history{n_steps_history}_neurons{n_neurons}_layers{n_layers}.pt")
                 best_val_loss = val_loss[-1]
-                
+        
+        if (e % 250) == 0:
+            if not isdir(save_best+f"snapshot_ep{e}/"):
+                os.mkdir(save_best+f"snapshot_ep{e}/")
+            pt.save(model.state_dict(), f"{save_best}snapshot_ep{e}/best_model_train_{lr}_n_history{n_steps_history}_neurons{n_neurons}_layers{n_layers}_ep{e}.pt")
+            pt.save(model.state_dict(), f"{save_best}snapshot_ep{e}/best_model_val_{lr}_n_history{n_steps_history}_neurons{n_neurons}_layers{n_layers}_ep{e}.pt")
+    
+        
+        # Early stopping
+        # if (train_loss[-1] <= 5e-6) and (val_loss[-1] <= 5e-6):
+        #     return train_loss, val_loss
+
     return train_loss, val_loss
 
-def split_sequence(data, n_steps_history, every_nth_element: int):
-    """Based on: https://machinelearningmastery.com/how-to-develop-multilayer-perceptron-models-for-time-series-forecasting/
+def split_sequence(data, n_steps_history: int, every_nth_element: int):
+    """Splits the data into sequences of states for model input according to n_steps_history
+    Based on: https://machinelearningmastery.com/how-to-develop-multilayer-perceptron-models-for-time-series-forecasting/
 
-    Args:
-        sequence (list): Sequence that should be split to get features and labels from it for prediction
-        n_steps (int): Number of time steps to be included into the state vector
+    Parameters
+    ----------
+    data : [type]
+        Sequence that should be split to get features and labels from it for prediction
+    n_steps_history : int
+        Number of time steps to be included into the state vector
+    every_nth_element : int
+        Every nth pressure sensor to be kept as input
 
-    Returns:
+    Returns
+    -------
+    torch.Tensor
         current_t: Current state vector with possible previous states
         next_t: The label vector to be predicted
+
     """
     reduced_data = change_n_pressure_sensors(data[:,1:-3], every_nth_element)
     sequence_p_a = pt.cat((reduced_data, data[:,-1].unsqueeze(dim=1)), dim=1)
@@ -165,20 +169,25 @@ def split_sequence(data, n_steps_history, every_nth_element: int):
 def reshape_data(t: pt.Tensor, p: pt.Tensor, c_D: pt.Tensor, c_L: pt.Tensor, omega: pt.Tensor) -> pt.Tensor:
     """Create feature and label vectors.
 
-    :param t: time steps
-    :type t: pt.Tensor
-    :param p: pressure from sensors along surface of cylinder
-    :type p: pt.Tensor
-    :param c_D: drag coefficient for time step t
-    :type c_D: pt.Tensor
-    :param c_L: lift coefficient for time step t
-    :type c_L: pt.Tensor()
-    :param omega: rotation velocity which is the taken action by the DRL agent
-    :type omega: pt.Tensor()
-    :return: data suitable for training; the Tensor should have the shape (N_t, 404)
-            corresponding to the states of the simulation containing time, omega, drag,
-            lift and the pressure values of the sensors for a number N_t of time steps
-    :rtype: pt.Tensor
+    Parameters
+    ----------
+    t : pt.Tensor
+        time steps
+    p : pt.Tensor
+        pressure from sensors along surface of cylinder
+    c_D : pt.Tensor
+        drag coefficient for time step t
+    c_L : pt.Tensor
+        lift coefficient for time step t
+    omega : pt.Tensor
+        rotation velocity which is the taken action by the DRL agent
+
+    Returns
+    -------
+    pt.Tensor
+        data suitable for training; the Tensor should have the shape (N_t, 404)
+        corresponding to the states of the simulation containing time, omega, drag,
+        lift and the pressure values of the sensors for a number N_t of time steps
     """
     assert t.shape[0] == p.shape[0]
     assert t.shape[0] == c_D.shape[0]
@@ -193,180 +202,150 @@ def reshape_data(t: pt.Tensor, p: pt.Tensor, c_D: pt.Tensor, c_L: pt.Tensor, ome
         data[i, -1] = omega[i]
     return data
 
-def evaluate_model(model: pt.nn.Module, feature: pt.Tensor, label: pt.Tensor, model_path: str):
+def evaluate_model(model: pt.nn.Module,
+                    features_norm: pt.Tensor,
+                    labels_norm: pt.Tensor,
+                    model_path: str,
+                    n_steps_history: int,
+                    every_nth_element: int,
+                    n_inputs: int):
     """This function evaluates the given model for given features and labels
 
-    Args:
-        :param model: Contains the model to be evaluated
-        :type model: pt.nn.Module
-        :param features: Contains the features the model should predict from
-        :type features: pt.Tensor()
-        :param labels:  Contains the labels data the prediction is tested against
-        :type labels: pt.Tensor
-        :param model_path: Contains the path where the model is stored
-        :type model_path: str
+    Parameters
+    ----------
+    model : pt.nn.Module
+        Model to be evaluated
+    features_norm : pt.Tensor
+        Features the model should predict from
+    labels_norm : pt.Tensor
+        Labels data the prediction is tested against
+    model_path : str
+        Path where the model is stored
+    n_steps_history : int
+        Number of subsequent states to be included in input
+    every_nth_element : int
+        Every nth pressure sensor to be kept as input
+    n_inputs : int
+        Number of input features for one training example of the model
 
-    Returns:
-        return test_loss_l2: Loss calculated using the L2 norm
-        return test_loss_lmax: Loss calculated using max norm
-        return r2score: R² (R squared) score of the prediction
-        rtype: Tuple(pt.Tensor, pt.Tensor, pt.Tensor)
-
+    Returns
+    -------
+    list, list, list, torch.Tensor, torch.Tensor, torch.Tensor
+        test_loss_l2: Loss calculated using the L2 norm
+        test_loss_lmax: Loss calculated using max norm
+        r2score: R² (R squared) score of the prediction
+        prediction_p: Predicted pressure values for all 400 sensors along the cylinder's surface
+        prediction_cd: Predicted drag coefficient
+        prediction_cl: Predicted lift coefficient
     """
-    
+    test_loss_l2 = []
+    test_loss_lmax = []
+    r2score = []
+    prediction_p = pt.zeros(labels_norm[:,:-2].shape)
+    prediction_cd = pt.zeros(labels_norm[:,-2].shape)
+    prediction_cl = pt.zeros(labels_norm[:,-1].shape)
     model.load_state_dict((pt.load(model_path)))
-    prediction = model(feature).squeeze().detach()
-    # we normalize the maximum error with the range of the scaled Ux,
-    # which is 1-(-1)=2
-    test_loss_l2 = (prediction - label).square().mean()
-    test_loss_lmax = (prediction - label).absolute().max() #/ 2
-    r2score = r2_score(label, prediction)
-    
-    print("MSE test loss: {:1.4e}".format(test_loss_l2))
-    print("Lmax test loss: {:1.4e}".format(test_loss_lmax))
-    print("R2 score: {:1.4e}".format(r2score))
-    
-    return test_loss_l2, test_loss_lmax, r2score
+    full_pred_norm = pt.zeros(labels_norm.shape)
+    for idx_t, state_t in enumerate(features_norm):
 
-def grid_search(features, labels, **kwargs):
-    """This function does a simple grid search for given hyperparameter optimization 
-    using the given features and labels and prints the optimal parametersthem to the terminal
+        pred_norm = model(state_t).squeeze().detach()
+        full_pred_norm[idx_t,:] = pred_norm
+        
+        prediction_p[idx_t] = pred_norm[:-2]
+        prediction_cd[idx_t] = pred_norm[-2]
+        prediction_cl[idx_t] = pred_norm[-1]
+        # we normalize the maximum error with the range of the scaled/normalized data,
+        # which is 1-(-1)=2
+        test_loss_l2.append((pred_norm - labels_norm[idx_t,:]).square().mean())
+        test_loss_lmax.append((pred_norm - labels_norm[idx_t,:]).absolute().max() / 2)
+        r2score.append(r2_score(labels_norm[idx_t,:], pred_norm))
+        
+        print("\r", "L2 loss: {:1.4f}, Lmax loss: {:1.4f}, r2 score: {:1.4f}".format(test_loss_l2[idx_t], test_loss_lmax[idx_t], r2score[idx_t]), end="\r")
 
-    Args:
-        :param features: Contains the features for training
-        :type features: pt.Tensor(pt.Tensor)
-        :param labels: Contains the labels for training
-        :type labels: pt.Tensor(pt.Tensor)
-    """
-
-    variation_neurons = kwargs.get("n_neurons")
-    variation_layers = kwargs.get("n_layers")
-    variation_lr = kwargs.get("lr")
+        if idx_t == labels_norm.shape[0]-1:
+            break
+        features_norm[idx_t+1,(n_steps_history-1)*n_inputs:-1] = pred_norm[:-2][::every_nth_element]
     
-    train_losses = np.zeros((len(variation_neurons)*len(variation_layers)*len(variation_lr), 4))
-    
-    idx = 0
-    for n_layers in variation_layers:
-        for n_neurons in variation_neurons:
-            for lr in variation_lr:
-                params = {
-                    "n_layers": int(n_layers),
-                    "n_neurons": int(n_neurons),
-                }
-                model = FFMLP(**params)
-                train_loss = optimize_model_gs(model, features, labels, 1000, lr=lr)
-                train_losses[idx, 0] = train_loss[-1]
-                train_losses[idx, 1] = lr
-                train_losses[idx, 2] = n_neurons
-                train_losses[idx, 3] = n_layers
-
-                print(f"\nLoss: {train_losses[idx, 0]}|Lr: {train_losses[idx, 1]}|Neurons: {int(train_losses[idx, 2])}|Layers: {int(train_losses[idx, 3])}")
-                idx = idx + 1
-    
-    min_index = np.argmin(train_losses)
-    best_params = train_losses[min_index, :]
-    
-    print("\nbest score: {:.3f}, best params: lr={}, n_neurons={}, n_layers={}".format(best_params[0], best_params[1], int(best_params[2]), int(best_params[3])))
-
+    return test_loss_l2, test_loss_lmax, r2score, prediction_p, prediction_cd, prediction_cl
 
 class MinMaxScaler(object):
-    """Class to scale/re-scale data to the range [-1, 1] and back.
+    """Class to scale/re-scale data to the range [-1, 1] and back by min/max scaling.
     """
     def __init__(self):
+        """Constructor of MinMaxScaler class
+        """
         self.min = None
         self.max = None
         self.trained = False
 
     def fit(self, data):
+        """Stores min and max values of given data
+
+        Parameters
+        ----------
+        data : torch.Tensor
+            Data tensor
+        """
         self.min = pt.min(data)
         self.max = pt.max(data)
         self.trained = True
 
     def scale(self, data):
+        """Scales the data according to stored min/max values
+
+        Parameters
+        ----------
+        data : torch.Tensor
+            Data tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Scaled/normalized data
+        """
         assert self.trained
         assert len(data.shape) == 3 # Assert dimension of input data
         data_norm = (data - self.min) / (self.max - self.min)
         return 2.0*data_norm - 1.0 # Scale between [-1, 1]
 
     def rescale(self, data_norm):
+        """Rescales the normalized data back
+
+        Parameters
+        ----------
+        data_norm : torch.Tensor
+            Normalized data tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Denormalized data
+        """
         assert self.trained
-        assert len(data_norm.shape) == 2
         data = (data_norm + 1.0) * 0.5
         return data * (self.max - self.min) + self.min
 
-def data_loading_all(location: str):
-    """Loads the data located at the given location
+def data_scaling(data):
+    """Conducts input data preprocessing (i.e. min-max scaling, train, val, test set splitting etc.)
 
     Parameters
     ----------
-    location : str
-        String storing the location of the to be loaded data
+    data : torch.Tensor
+        Pytorch tensor containing the input data with the columns [t, p0-p400, cd, cl, omega]
 
     Returns
     -------
-    numpy.ndarray
-        All relevant trajectory data (t, p, cd, cl, omega) located at location
+    data_norm: torch.Tensor
+        Normalized data
+    scaler_pressure: MinMaxScaler
+        Scaler object for pressure min/max scaling
+    scaler_cd: MinMaxScaler
+        Scaler object for cd min/max scaling
+    scaler_cl: MinMaxScaler
+        Scaler object for cl min/max scaling
+    scaler_omega: MinMaxScaler
+        Scaler object for omega min/max scaling
     """
-    n_sensors = 400
-
-    trajectory_files = glob(location)
-    trajectory_files = sorted(trajectory_files)
-    
-    all_trajectory_data = np.zeros((len(trajectory_files), 399, n_sensors + 4))
-    
-    for i, file in enumerate(trajectory_files):
-        print(f"Loaded trajectories: {i}", end="\r")
-        coeff_data, trajectory_data, p_at_faces = read_data_from_trajectory(file, n_sensors)
-        time_steps = coeff_data.t.values
-        c_d = coeff_data.c_d.values
-        c_l = coeff_data.c_l.values
-        actions = trajectory_data.omega.values
-        p_states = pt.Tensor(trajectory_data[p_at_faces].values)
-        single_trajectory_data = reshape_data(time_steps, p_states, c_d, c_l, actions)
-        all_trajectory_data[i] = single_trajectory_data
-        
-    return all_trajectory_data
-
-
-def data_loading(location: str):
-    """This function loads the data that is located in location
-
-    Args:
-        :param location: String containing the file path for trajectories
-        :type location: str()
-    Returns:
-        :return: Data loaded from location
-        rtype data: pt.Tensor(pt.Tensor())
-    """
-    n_sensors = 400
-
-    # Extract data from trajectory
-    trajectory_file = glob(location)
-    coeff_data, trajectory_data, p_at_faces = read_data_from_trajectory(trajectory_file[0], n_sensors)
-
-    # Get drag and lift coefficients and pressure values
-    time_steps = coeff_data.t.values
-    c_d = coeff_data.c_d.values
-    c_l = coeff_data.c_l.values
-    actions = trajectory_data.omega.values
-    p_states = pt.Tensor(trajectory_data[p_at_faces].values)
-
-    # Reshape data into one pytorch tensor
-    data = reshape_data(time_steps, p_states, c_d, c_l, actions)
-    return data
-
-def data_scaling(data):
-    """This function is responsible for the input data preprocessing (i.e. min-max scaling, train, val, test set splitting etc.)
-
-    Args:
-        :param data: Pytorch tensor containing the input data with the columns [t, p0-p400, cd, cl, omega]
-        :type data: (pt.Tensor)
-    Returns:
-        :return: Lists of training, validation and test data consisting of feature and label.
-        Furthermore the normalization scalers for the data are returned
-        :rtype: Tuple[pt.Tensor, MinMaxScaler, MinMaxScaler, MinMaxScaler, MinMaxScaler]
-    """
-
     # Normalize data
     # The pressure values are normalized only by the data of the corresponding sensor
     data_norm = pt.Tensor(data)
@@ -385,18 +364,22 @@ def data_scaling(data):
 
     return data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega
 
-
 def generate_labeled_data(data_norm: pt.Tensor, n_steps_history: int, every_nth_element: int):
     """Creates the feature and label tensors from the input data
 
-    Args:
-        :param data_norm: Normalized input data
-        :type data_norm: pt.Tensor
-        :param n_steps_history: Time step history of feature vectors to be included
-        :type n_steps_history: int
-    Returns:
-        :return: Dict of feature and label vector
-        :rtype: [pt.Tensor, pt.Tensor]
+    Parameters
+    ----------
+    data_norm : pt.Tensor
+        Normalized input data
+    n_steps_history : int
+        Number of subsequent states to be included in model input
+    every_nth_element : int
+        Every nth pressure sensor to be kept as input
+
+    Returns
+    -------
+    [data_norm_features, data_norm_labels]: Dict(torch.Tensor, torch.Tensor)
+        Dict of feature and label vector
     """
     reduced_p_dimension = int(n_steps_history * (((data_norm.shape[2] - 4) / every_nth_element) + 1))
     
@@ -414,22 +397,24 @@ def generate_labeled_data(data_norm: pt.Tensor, n_steps_history: int, every_nth_
 
     return [data_norm_features, data_norm_labels]
 
-
 def split_data(data: pt.Tensor, test_portion_rel: float=0.20, val_portion_rel: float=0.10):
     """Splits data into train, validation and test set
 
-    Args:
-        :param data: Input data to be split
-        :type data:  pt.Tensor
-        :param test_portion_rel: Test portion of the data
-        :type test_portion_rel: float
-        :param val_portion_rel: Validation portion of the data
-        :type val_portion_rel: float
-    Returns:
-        :return: A tuple of three lists storing pairs of feature and label tensors for training, validation and test
-        :rtype: tuple(list(pt.Tensor), list(pt.Tensor), list(pt.Tensor))
-    """
+    Parameters
+    ----------
+    data : pt.Tensor
+        Input data to be split
+    test_portion_rel : float, optional
+        Test portion of the data, by default 0.20
+    val_portion_rel : float, optional
+        Validation portion of the data, by default 0.10
 
+    Returns
+    -------
+    [train_data_features, train_data_labels], [val_data_features, val_data_labels], [test_data_features, test_data_labels]:
+        Tuple(list(torch.Tensor, torch.Tensor), list(torch.Tensor, torch.Tensor), list(torch.Tensor, torch.Tensor))
+        A tuple of three lists storing pairs of feature and label tensors for training, validation and test
+    """
     test_portion_abs = round(test_portion_rel * data[0].shape[0])
     val_portion_abs = round(val_portion_rel * data[0].shape[0])
     train_portion_abs = data[0].shape[0] - val_portion_abs - test_portion_abs
@@ -459,10 +444,25 @@ def split_data(data: pt.Tensor, test_portion_rel: float=0.20, val_portion_rel: f
     
     return [train_data_features, train_data_labels], [val_data_features, val_data_labels], [test_data_features, test_data_labels]
 
-def change_n_pressure_sensors(data_norm_p, every_nth_element: int):    
+def change_n_pressure_sensors(data_norm_p, every_nth_element: int):
+    """Reduce the number of pressure sensors
+        Keep Only the every nth sensor
+
+    Parameters
+    ----------
+    data_norm_p : pt.Tensor
+        All pressure data with dimension 400
+    every_nth_element : int
+        Keep only every nth sensor
+
+    Returns
+    -------
+    pt.Tensor
+        Reduced number of pressure sensor data
+    """
     data_norm_p_reduced = pt.zeros((data_norm_p.shape[0], int(data_norm_p.shape[1]/every_nth_element)))
-    for i, time_step in enumerate(data_norm_p):
-        data_norm_p_reduced[i] = time_step[::every_nth_element]
+    for i, state in enumerate(data_norm_p):
+        data_norm_p_reduced[i] = state[::every_nth_element]
     
     return data_norm_p_reduced
 
@@ -471,60 +471,75 @@ def main():
     # Seeding
     pt.manual_seed(0)
 
-    location = f'../training/initial_trajectories/Data/sample_[0-2]/trajectory_*/'
-    location = f'../training/initial_trajectories/Data/sample_[6-8]/trajectory_*/'
-    location = f'../training/initial_trajectories/Data/sample_*/trajectory_*/'
+    location = "DRL_py_beta/training_pressure_model/initial_trajectories/initial_trajectory_data_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
+    data_total = pt.load(location)
+    
     # Grid search set, up
-    learning_rates_space = [0.0001]#, 0.00001]
-    hidden_layers_space = [4]
-    neurons_space = [220]
-    steps_space = [4]#, 2, 3]
+    learning_rates_space = [0.0001]
+    hidden_layers_space = [5]
+    neurons_space = [30]
+    steps_space = [2,3,4]
     n_sensors = 400
     every_nth_element = 25
+    n_sensors_keep = n_sensors / every_nth_element
     assert n_sensors % every_nth_element == 0, "You can only keep an even number of sensors!"
-    input = int(400 / every_nth_element + 1)
+    n_inputs = int(400 / every_nth_element + 1)
     output = 400 + 2
-    batch_size = 8
-    #n_steps_history = 1
+    batch_size = 5
     
     for lr in learning_rates_space:
         for hidden_layer in hidden_layers_space:
             for neurons in neurons_space:
                 for n_steps_history in steps_space:
-                    #neurons = neurons * n_steps_history
-    
-                    data = data_loading_all(location)
+
+                    # Draw randomly k sample trajectories from all data
+                    perm = torch.randperm(data_total.size(0))
+                    k = 30
+                    idx = perm[:k]
+                    samples = data_total[idx]
+                    data = samples
+                    
                     data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
                     data_labeled = generate_labeled_data(data_norm, n_steps_history, every_nth_element)
                     train_data, val_data, test_data = split_data(data_labeled)
+                    # data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
+                    # train_data, val_data, test_data = split_data(data_labeled)
+                    
                     ######################################
                     # Training
                     ######################################
+                    # DATA SHAPE: t, p400, cd, cl, omega
                     
-                    # Initialize the MLP
-                    # model_params = {
-                    #     "n_inputs": n_steps_history * 401,
-                    #     "n_outputs": 402,
-                    #     "n_layers": 5,
-                    #     "n_neurons": 100,
-                    #     "activation": pt.nn.ReLU()
-                    # }
+                    p_min = pt.min(data[:, :,1:-3])
+                    p_max = pt.max(data[:, :,1:-3])
+                    c_d_min = pt.min(data[:,:,-3])
+                    c_d_max = pt.max(data[:,:,-3])
+                    c_l_min = pt.min(data[:,:,-2])
+                    c_l_max = pt.max(data[:,:,-2])
+                    omega_min = pt.min(data[:, :,-1])
+                    omega_max = pt.max(data[:, :,-1])
                     model_params = {
-                        "n_inputs": n_steps_history * input,
+                        "n_inputs": n_steps_history * n_inputs,
                         "n_outputs": output,
                         "n_layers": hidden_layer,
                         "n_neurons": neurons,
-                        "activation": pt.nn.ReLU()
+                        "activation": pt.nn.ReLU(),
+                        "n_steps": n_steps_history,
+                        "n_p_sensors": n_sensors_keep,
+                        "p_min": p_min,
+                        "p_max": p_max,
+                        "c_d_min": c_d_min,
+                        "c_d_max": c_d_max,
+                        "c_l_min": c_l_min,
+                        "c_l_max": c_l_max,
+                        "omega_min": omega_min,
+                        "omega_max": omega_max
                     }
 
                     model = FFMLP(**model_params)
                     epochs = 10000
-                    # lr = 0.0001
-                    # save_model_in = f"DRL_py_beta/model/first_training/220_4_3_0-0001_1_30_p10/"
-                    save_model_in = f"DRL_py_beta/model/first_training/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{every_nth_element}/"
-                    if isdir(save_model_in):
-                        pass
-                    else:
+                    save_model_in = f"DRL_py_beta/training_pressure_model/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{every_nth_element}/"
+                    if not isdir(save_model_in):
                         os.mkdir(save_model_in)
                     
                     # Actually train model
@@ -535,117 +550,79 @@ def main():
                                                         batch_size=batch_size,
                                                         epochs=epochs, save_best=save_model_in, lr=lr)
 
+                    # # Min/Max Scaler wrapper model
+                    # wrapper = WrapperModel(model,
+                    #                        p_min, p_max,
+                    #                        omega_min, omega_max,
+                    #                        c_d_min, c_d_max,
+                    #                        c_l_min, c_l_max,
+                    #                        n_steps_history,
+                    #                        n_sensors_keep)
+
+                    # train_loss, val_loss = optimize_model(wrapper, train_data[0], train_data[1],
+                    #                                     val_data[0], val_data[1], n_steps_history,
+                    #                                     n_neurons=model_params["n_neurons"],
+                    #                                     n_layers=model_params["n_layers"],
+                    #                                     batch_size=batch_size, 
+                    #                                     epochs=epochs, save_best=save_model_in, lr=lr)
+
                     # Plot data
-                    plot_loss(train_loss, val_loss, loss_type="MSE", lr=lr, n_neurons=model_params["n_neurons"], 
-                                                n_layers=model_params["n_layers"], n_steps_history=n_steps_history, save_plots_in=save_model_in, show=False)
+                    plot_loss(train_loss,
+                                val_loss,
+                                loss_type="MSE", 
+                                lr=lr,
+                                n_neurons=model_params["n_neurons"],
+                                n_layers=model_params["n_layers"],
+                                n_steps_history=n_steps_history,
+                                save_plots_in=save_model_in, show=False)
 
-                    model.load_state_dict(pt.load("{}best_model_train_{}_n_history{}_neurons{}_layers{}.pt".format(save_model_in, lr, n_steps_history, model_params["n_neurons"], model_params["n_layers"])))
-                    # full_pred_norm = model(test_data[0][0,:,:]).squeeze().detach()
-                    # full_pred = pt.zeros(full_pred_norm.shape)
-                    # full_pred[:, :-2] = scaler_pressure.rescale(full_pred_norm[:, :-2])
-                    # full_pred[:,-2] = scaler_cd.rescale(full_pred_norm[:,-2].unsqueeze(dim=0))
-                    # full_pred[:,-1] = scaler_cl.rescale(full_pred_norm[:,-1].unsqueeze(dim=0))
-                    # test_data[1][0,:,-2] = scaler_cd.rescale(test_data[1][0,:,-2].unsqueeze(dim=0))
-                    # test_data[1][0,:,:-2] = scaler_pressure.rescale(test_data[1][0,:,:-2])#.unsqueeze(dim=0))
-                    # test_data[1][0,:,-1] = scaler_cl.rescale(test_data[1][0,:,-1].unsqueeze(dim=0))
+                    model_path = "{}best_model_train_{}_n_history{}_neurons{}_layers{}.pt".format(save_model_in, lr, n_steps_history, model_params["n_neurons"], model_params["n_layers"])
+                    
+                    idx_test_trajectory = 1
+                    time_steps = data[0,n_steps_history:,0]
+                    test_features_norm = test_data[0][idx_test_trajectory,:,:]
+                    test_labels_norm = test_data[1][idx_test_trajectory,:,:]
+                    
+                    test_loss_l2, test_loss_lmax, r2score, prediction_p, prediction_cd, prediction_cl = evaluate_model(model,
+                                                                                                                       test_features_norm,
+                                                                                                                       test_labels_norm,
+                                                                                                                       model_path,
+                                                                                                                       n_steps_history,
+                                                                                                                       every_nth_element,
+                                                                                                                       n_inputs)
 
-                    test_loss_l2 = []
-                    test_loss_lmax = []
-                    r2score = []
-                    full_pred_norm = pt.zeros(test_data[1][1,:,:].shape)
-                    test_data_new = test_data[0][1,:,:]
-                    for idx_t, state_t in enumerate(test_data_new[:,:]):
-                        # if idx_t >= int(test_data[0][0,:,:].shape[0])-1:
-                        #     break
-                        pred_norm = model(state_t).squeeze().detach()
-                        full_pred_norm[idx_t,:] = pred_norm
-                        test_loss_l2.append((pred_norm - test_data[1][1,idx_t,:]).square().mean())
-                        test_loss_lmax.append((pred_norm - test_data[1][1,idx_t,:]).absolute().max()) #/ 2
-                        r2score.append(r2_score(test_data[1][1,idx_t,:], pred_norm))
-                        print(f"L2 loss: {test_loss_l2[idx_t]}")
-                        print(f"Lmax loss: {test_loss_lmax[idx_t]}")
-                        print(f"r2 score: {r2score[idx_t]}")
-                        if idx_t == test_data_new[:,:].shape[0]-1:
-                            break
-                        test_data_new[idx_t+1,(n_steps_history-1)*input:-1] = pred_norm[:-2][::every_nth_element]
+                    labels_p_norm = test_labels_norm[:,:-2]
 
-                    test_data[1][1,:,-2] = scaler_cd.rescale(test_data[1][1,:,-2].unsqueeze(dim=0))
-                    test_data[1][1,:,:-2] = scaler_pressure.rescale(test_data[1][1,:,:-2])#.unsqueeze(dim=0))
-                    test_data[1][1,:,-1] = scaler_cl.rescale(test_data[1][1,:,-1].unsqueeze(dim=0))
+                    # labels[:,:-2] = scaler_pressure.rescale(labels[:,:-2])
+                    labels_cd = scaler_cd.rescale(test_labels_norm[:,-2])
+                    labels_cl = scaler_cl.rescale(test_labels_norm[:,-1])
 
-                    full_pred = pt.zeros(full_pred_norm.shape)
-                    full_pred[:, :-2] = scaler_pressure.rescale(full_pred_norm[:, :-2])
-                    full_pred[:,-2] = scaler_cd.rescale(full_pred_norm[:,-2].unsqueeze(dim=0))
-                    full_pred[:,-1] = scaler_cl.rescale(full_pred_norm[:,-1].unsqueeze(dim=0))
+                    # prediction_p = scaler_pressure.rescale(prediction_p)
+                    prediction_cd = scaler_cd.rescale(prediction_cd)
+                    prediction_cl = scaler_cl.rescale(prediction_cl)
 
-                    fig, ax = plt.subplots(5,1)
-                    fig.suptitle(f"FFNN, lr={lr}, neurons={neurons}, layers={hidden_layer}, steps={n_steps_history}")
-                    ax[0].plot(range(0,len(test_loss_l2)), test_loss_l2)
-                    ax[1].plot(range(0,len(test_loss_lmax)), test_loss_lmax)
-                    ax[2].plot(range(0,len(r2score)), r2score)
-                    ax[3].plot(data[0,n_steps_history:,0],full_pred[:,-2], label="prediction", c="C3", ls="--")
-                    ax[3].plot(data[0,n_steps_history:,0],test_data[1][1,:,-2], label="reference", c="k")
-                    ax[4].plot(data[0,n_steps_history:,0],full_pred[:,-1], label="prediction", c="C3", ls="--")
-                    ax[4].plot(data[0,n_steps_history:,0],test_data[1][1,:,-1], label="reference", c="k")
-                    
-                    ax[0].set_xlabel("Time step")
-                    ax[1].set_xlabel("Time step")
-                    ax[2].set_xlabel("Time step")
-                    ax[3].set_xlabel("Time [s]")
-                    ax[4].set_xlabel("Time [s]")
-                    
-                    ax[0].set_ylabel("L2 loss")
-                    ax[1].set_ylabel("Lmax loss")
-                    ax[2].set_ylabel("R² Score")
-                    ax[3].set_ylabel(r"$c_D$")
-                    ax[4].set_ylabel(r"$c_L$")
-                    
-                    # ax[0].set_title("L2 loss vs time steps")
-                    # ax[1].set_title("Lmax loss vs time steps")
-                    # ax[2].set_title("R² score vs time steps")
-                    # ax[3].set_title(r"$c_D$ vs time")
-                    # ax[4].set_title(r"$c_L$ vs time")
-                    
-                    fig.legend(loc="upper right")
-                    # fig.tight_layout(pad=0.4, w_pad=0.01, h_pad=1.0)
-                    fig.show()
-                    fig.savefig(f"{save_model_in}/evalutation_lr{lr}_neurons{neurons}_nlayers{hidden_layer}_nhistory{n_steps_history}.svg")#, bbox_inches="tight")
-                    
-                    # error = pt.transpose((((test_data[1][0,:,:-2] - full_pred[:,:-2]))), 0, 1)
-                    # absolute_error = error.abs()
-                    # sensors = pt.linspace(1, 400, 400)
-                    
-                    # fig, ax = plt.subplots(2,1)
-                    # pcol1 = ax[0].pcolormesh(data[0,1:,0], sensors, error, shading='auto')
-                    # pcol2 = ax[1].pcolormesh(data[0,1:,0], sensors, absolute_error, shading='auto')
-                    # fig.colorbar(pcol1, ax=ax[0], label=r"Error")
-                    # fig.colorbar(pcol2, ax=ax[1], label=r"Absolut error")
-                    # ax[0].set_xlabel(r"t [s]")
-                    # ax[1].set_xlabel(r"t [s]")
-                    # ax[0].set_ylabel(r"Sensor")
-                    # ax[1].set_ylabel(r"Sensor")
-                    # fig.show()
-                    
-                    
-                    
-                    # path = "{}best_model_train_{}_n_history{}_neurons{}_layers{}.pt".format(save_model_in, lr, n_steps_history, model_params["n_neurons"], model_params["n_layers"])
-                    # evaluate_model(model, train_data[0][11,:,:] ,train_data[1][11,:,:],path)
-                    
-                    # # Plot drag coefficient c_D
-                    # plot_coefficient_prediction(data[0,n_steps_history:,0], test_data[1][0,:,-2], full_pred[:,-2], #data[0,n_steps_history:,-3]
-                    #                             y_label="c_D", save_plots_in=save_model_in, 
-                    #                             lr=lr, n_neurons=model_params["n_neurons"], 
-                    #                             n_layers=model_params["n_layers"], n_steps_history=n_steps_history)
-                    # # # Plot lift coefficient c_L
-                    # plot_coefficient_prediction(data[0,n_steps_history:,0], test_data[1][0,:,-1], full_pred[:,-1], 
-                    #                             y_label="c_L", save_plots_in=save_model_in, 
-                    #                             lr=lr, n_neurons=model_params["n_neurons"], 
-                    #                             n_layers=model_params["n_layers"], n_steps_history=n_steps_history)
-                    # Plot feature space heat map
-                    
-                    plot_feature_space_error_map(pt.Tensor(data[0,n_steps_history:,0]).detach(), pt.Tensor(test_data[1][1,:,:-2]).detach(),
-                                                full_pred[:,:-2], save_model_in, lr=lr, n_neurons=model_params["n_neurons"], 
-                                                n_layers=model_params["n_layers"], n_steps_history=n_steps_history)
+                    plot_evaluation(time_steps,
+                                    labels_cd,
+                                    prediction_cd,
+                                    labels_cl,
+                                    prediction_cl,
+                                    test_loss_l2,
+                                    test_loss_lmax,
+                                    r2score,
+                                    save_model_in,
+                                    lr,
+                                    neurons,
+                                    hidden_layer,
+                                    n_steps_history)
+
+                    plot_feature_space_error_map(time_steps = time_steps,
+                                                reference = labels_p_norm,
+                                                prediction = prediction_p,
+                                                save_plots_in = save_model_in,
+                                                lr = lr,
+                                                n_neurons = model_params["n_neurons"],
+                                                n_layers = model_params["n_layers"],
+                                                n_steps_history = n_steps_history)
         
 if __name__ == '__main__':
     main()
