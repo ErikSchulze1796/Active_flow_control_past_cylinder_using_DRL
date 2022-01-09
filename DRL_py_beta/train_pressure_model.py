@@ -472,31 +472,30 @@ def main():
     pt.manual_seed(0)
 
     location = "DRL_py_beta/training_pressure_model/initial_trajectories/initial_trajectory_data_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
-    data_total = pt.load(location)
+    data = pt.load(location)
     
     # Grid search set, up
     learning_rates_space = [0.0001]
-    hidden_layers_space = [5]
-    neurons_space = [30]
-    steps_space = [2,3,4]
+    hidden_layers_space = [2]
+    neurons_space = [400]
+    steps_space = [4]
     n_sensors = 400
     every_nth_element = 25
-    n_sensors_keep = n_sensors / every_nth_element
+    n_sensors_keep = int(n_sensors / every_nth_element)
     assert n_sensors % every_nth_element == 0, "You can only keep an even number of sensors!"
     n_inputs = int(400 / every_nth_element + 1)
     output = 400 + 2
     batch_size = 5
-    
     for lr in learning_rates_space:
         for hidden_layer in hidden_layers_space:
             for neurons in neurons_space:
                 for n_steps_history in steps_space:
 
                     # Draw randomly k sample trajectories from all data
-                    perm = torch.randperm(data_total.size(0))
+                    perm = torch.randperm(data.size(0))
                     k = 30
                     idx = perm[:k]
-                    samples = data_total[idx]
+                    samples = data[idx]
                     data = samples
                     
                     data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
@@ -537,19 +536,32 @@ def main():
                     }
 
                     model = FFMLP(**model_params)
-                    epochs = 10000
-                    save_model_in = f"DRL_py_beta/training_pressure_model/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{every_nth_element}/"
+                    epochs = 10
+                    save_model_in = f"DRL_py_beta/training_pressure_model/thesis_quality/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{every_nth_element}_eps{epochs}/"
                     if not isdir(save_model_in):
                         os.mkdir(save_model_in)
                     
                     # Actually train model
+                    start = datetime.datetime.now()
                     train_loss, val_loss = optimize_model(model, train_data[0], train_data[1],
                                                         val_data[0], val_data[1], n_steps_history,
                                                         n_neurons=model_params["n_neurons"],
                                                         n_layers=model_params["n_layers"],
                                                         batch_size=batch_size,
                                                         epochs=epochs, save_best=save_model_in, lr=lr)
-
+                    end = datetime.datetime.now()
+                    duration = end - start
+                    run_data_file_path = save_model_in + f"run_data_{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{every_nth_element}_eps{epochs}.txt"
+                    with open(run_data_file_path, 'a') as file:
+                        file.write(f'Training duration: {duration}\n')
+                        file.write(f'No. of epochs: {epochs}\n')
+                        file.write(f'Learning rate: {lr}\n')
+                        file.write(f'Batch size: {batch_size}\n')
+                        file.write(f'Neurons: {neurons}\n')
+                        file.write(f'Hidden layers: {hidden_layer}\n')
+                        file.write(f'No. of subsequent time steps: {n_steps_history}\n')
+                        file.write(f'No. of trajectories: {len(data)}\n')
+                        file.write(f'No. of pressure sensors as input: {n_sensors_keep}\n')
                     # # Min/Max Scaler wrapper model
                     # wrapper = WrapperModel(model,
                     #                        p_min, p_max,
