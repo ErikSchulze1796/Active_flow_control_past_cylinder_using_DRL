@@ -30,23 +30,24 @@ def main():
     neurons_space = [50]
     steps_space = [4]
     n_sensors = 400
+    # Keep only every nth pressure sensor of input state
     every_nth_element = 25
     n_sensors_keep = int(n_sensors / every_nth_element)
     assert n_sensors % every_nth_element == 0, "You can only keep an even number of sensors!"
     n_inputs = int(400 / every_nth_element + 1)
     output = 400 + 2
-    batch_size = 5
+    batch_size = 32
     for lr in learning_rates_space:
         for hidden_layer in hidden_layers_space:
             for neurons in neurons_space:
                 for n_steps_history in steps_space:
 
                     # Draw randomly k sample trajectories from all data
-                    perm = pt.randperm(data.size(0))
-                    k = 30
-                    idx = perm[:k]
-                    samples = data[idx]
-                    data = samples
+                    # perm = pt.randperm(data.size(0))
+                    # k = 30
+                    # idx = perm[:k]
+                    # samples = data[idx]
+                    # data = samples
                     
                     data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
                     data_labeled = generate_labeled_data(data_norm, n_steps_history, every_nth_element)
