@@ -26,6 +26,22 @@ class MinMaxScaler(object):
         self.max = pt.max(data)
         self.trained = True
 
+    def refit(self, data):
+        """Refits the min, max values if new data is available
+
+        Parameters
+        ----------
+        data : torch.Tensor
+            Data to get min max from
+        """
+        new_min = pt.min(data)
+        new_max = pt.max(data)
+        if new_min < self.min:
+            self.min = new_min
+        if new_max > self.max:
+            self.max = new_max
+        self.trained = True
+
     def scale(self, data):
         """Scales the data according to stored min/max values
 
@@ -61,8 +77,8 @@ class MinMaxScaler(object):
         data = (data_norm + 1.0) * 0.5
         return data * (self.max - self.min) + self.min
 
-def data_scaling(data):
-    """Conducts input data preprocessing (i.e. min-max scaling, train, val, test set splitting etc.)
+def data_scaling(train_data_unscaled, val_data_unscaled, test_data_unscaled):
+    """Conducts input data preprocessing (i.e. min-max scaling)
 
     Parameters
     ----------
@@ -83,22 +99,52 @@ def data_scaling(data):
         Scaler object for omega min/max scaling
     """
     # Normalize data
-    # The pressure values are normalized only by the data of the corresponding sensor
-    data_norm = pt.Tensor(data)
-    scaler_pressure = MinMaxScaler()
-    scaler_pressure.fit(data_norm[:, :,1:-3])
-    data_norm[:, :, 1:-3] = scaler_pressure.scale(data_norm[:, :,1:-3])
-    scaler_cd = MinMaxScaler()
-    scaler_cd.fit(data_norm[:, :,-3])
-    data_norm[:, :,-3] = scaler_cd.scale(data_norm[:, :,-3].unsqueeze(dim=0))
-    scaler_cl = MinMaxScaler()
-    scaler_cl.fit(data_norm[:, :,-2])
-    data_norm[:, :,-2] = scaler_cl.scale(data_norm[:, :,-2].unsqueeze(dim=0))
-    scaler_omega = MinMaxScaler()
-    scaler_omega.fit(data_norm[:, :,-1])
-    data_norm[:, :,-1] = scaler_omega.scale(data_norm[:, :,-1].unsqueeze(dim=0))
+    #data_norm = pt.Tensor(data)
+    train_data = train_data_unscaled
+    val_data = val_data_unscaled
+    test_data = test_data_unscaled
 
-    return data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega
+    # Scale pressure values to min-max-scale but only using the training set
+    scaler_pressure = MinMaxScaler()
+    # Scale both feature and label vector
+    scaler_pressure.fit(train_data[0][:, :,:-1])
+    scaler_pressure.refit(train_data[1][:, :,:-2])
+    
+    train_data[0][:, :, :-1] = scaler_pressure.scale(train_data[0][:, :,:-1])
+    val_data[0][:, :, :-1] = scaler_pressure.scale(val_data[0][:, :,:-1])
+    test_data[0][:, :, :-1] = scaler_pressure.scale(test_data[0][:, :,:-1])
+    train_data[1][:, :, :-2] = scaler_pressure.scale(train_data[1][:, :,:-2])
+    val_data[1][:, :, :-2] = scaler_pressure.scale(val_data[1][:, :,:-2])
+    test_data[1][:, :, :-2] = scaler_pressure.scale(test_data[1][:, :,:-2])
+
+    # Scale cd values to min-max-scale but only using the training set
+    scaler_cd = MinMaxScaler()
+    # Scale only label vector
+    scaler_cd.fit(train_data[1][:, :,-2])
+    
+    train_data[1][:, :,-2] = scaler_cd.scale(train_data[1][:, :,-2].unsqueeze(dim=0))
+    val_data[1][:, :,-2] = scaler_cd.scale(val_data[1][:, :,-2].unsqueeze(dim=0))
+    test_data[1][:, :,-2] = scaler_cd.scale(test_data[1][:, :,-2].unsqueeze(dim=0))
+
+    # Scale cl values to min-max-scale but only using the training set
+    scaler_cl = MinMaxScaler()
+    # Scale only label vector
+    scaler_cl.fit(train_data[1][:, :,-1])
+    
+    train_data[1][:, :,-1] = scaler_cl.scale(train_data[1][:, :,-1].unsqueeze(dim=0))
+    val_data[1][:, :,-1] = scaler_cl.scale(val_data[1][:, :,-1].unsqueeze(dim=0))
+    test_data[1][:, :,-1] = scaler_cl.scale(test_data[1][:, :,-1].unsqueeze(dim=0))
+
+    # Scale omega values to min-max-scale but only using the training set
+    scaler_omega = MinMaxScaler()
+    # Scale only feature vector
+    scaler_omega.fit(train_data[0][:, :,-1])
+
+    train_data[0][:, :,-1] = scaler_omega.scale(train_data[0][:, :,-1].unsqueeze(dim=0))
+    val_data[0][:, :,-1] = scaler_omega.scale(val_data[0][:, :,-1].unsqueeze(dim=0))
+    test_data[0][:, :,-1] = scaler_omega.scale(test_data[0][:, :,-1].unsqueeze(dim=0))
+
+    return train_data, val_data, test_data, scaler_pressure, scaler_cd, scaler_cl, scaler_omega
 
 def change_n_pressure_sensors(data_norm_p, every_nth_element: int):
     """Reduce the number of pressure sensors

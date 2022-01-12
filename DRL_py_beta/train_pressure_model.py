@@ -26,16 +26,16 @@ def main():
     # Grid search set, up
     epochs = 10000
     learning_rates_space = [0.0001]
-    hidden_layers_space = [2]
-    neurons_space = [100]
-    steps_space = [1,2,3,4]
+    hidden_layers_space = [5]
+    neurons_space = [50]
+    steps_space = [4]
     n_sensors = 400
-    every_nth_element = 1
+    every_nth_element = 25
     n_sensors_keep = int(n_sensors / every_nth_element)
     assert n_sensors % every_nth_element == 0, "You can only keep an even number of sensors!"
     n_inputs = int(400 / every_nth_element + 1)
     output = 400 + 2
-    batch_size = 1
+    batch_size = 5
     for lr in learning_rates_space:
         for hidden_layer in hidden_layers_space:
             for neurons in neurons_space:
@@ -43,14 +43,15 @@ def main():
 
                     # Draw randomly k sample trajectories from all data
                     perm = pt.randperm(data.size(0))
-                    k = 10
+                    k = 30
                     idx = perm[:k]
                     samples = data[idx]
                     data = samples
                     
-                    data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
-                    data_labeled = generate_labeled_data(data_norm, n_steps_history, every_nth_element)
-                    train_data, val_data, test_data = split_data(data_labeled)
+                    # data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
+                    data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
+                    train_data_unscaled, val_data_unscaled, test_data_unscaled = split_data(data_labeled)
+                    train_data, val_data, test_data, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(train_data_unscaled, val_data_unscaled, test_data_unscaled)
                     # data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
                     # train_data, val_data, test_data = split_data(data_labeled)
                     
@@ -59,14 +60,14 @@ def main():
                     ######################################
                     # DATA SHAPE: t, p400, cd, cl, omega
                     
-                    p_min = pt.min(data[:, :,1:-3])
-                    p_max = pt.max(data[:, :,1:-3])
-                    c_d_min = pt.min(data[:,:,-3])
-                    c_d_max = pt.max(data[:,:,-3])
-                    c_l_min = pt.min(data[:,:,-2])
-                    c_l_max = pt.max(data[:,:,-2])
-                    omega_min = pt.min(data[:, :,-1])
-                    omega_max = pt.max(data[:, :,-1])
+                    # p_min = pt.min(data[:, :,1:-3])
+                    # p_max = pt.max(data[:, :,1:-3])
+                    # c_d_min = pt.min(data[:,:,-3])
+                    # c_d_max = pt.max(data[:,:,-3])
+                    # c_l_min = pt.min(data[:,:,-2])
+                    # c_l_max = pt.max(data[:,:,-2])
+                    # omega_min = pt.min(data[:, :,-1])
+                    # omega_max = pt.max(data[:, :,-1])
                     model_params = {
                         "n_inputs": n_steps_history * n_inputs,
                         "n_outputs": output,
@@ -75,18 +76,19 @@ def main():
                         "activation": pt.nn.ReLU(),
                         "n_steps": n_steps_history,
                         "n_p_sensors": n_sensors_keep,
-                        "p_min": p_min,
-                        "p_max": p_max,
-                        "c_d_min": c_d_min,
-                        "c_d_max": c_d_max,
-                        "c_l_min": c_l_min,
-                        "c_l_max": c_l_max,
-                        "omega_min": omega_min,
-                        "omega_max": omega_max
                     }
+                    #     "p_min": p_min,
+                    #     "p_max": p_max,
+                    #     "c_d_min": c_d_min,
+                    #     "c_d_max": c_d_max,
+                    #     "c_l_min": c_l_min,
+                    #     "c_l_max": c_l_max,
+                    #     "omega_min": omega_min,
+                    #     "omega_max": omega_max
+                    # }
 
                     model = FFNN(**model_params)
-                    save_model_in = f"DRL_py_beta/training_pressure_model/thesis_quality/test/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{n_sensors_keep}_eps{epochs}/"
+                    save_model_in = f"DRL_py_beta/training_pressure_model/thesis_quality/leakage_test/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{n_sensors_keep}_eps{epochs}/"
                     if not isdir(save_model_in):
                         makedirs(save_model_in)
                     
@@ -100,7 +102,7 @@ def main():
                                                         epochs=epochs, save_best=save_model_in, lr=lr)
                     end = datetime.datetime.now()
                     duration = end - start
-                    run_data_file_path = save_model_in + f"run_data_{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{every_nth_element}_eps{epochs}.txt"
+                    run_data_file_path = save_model_in + f"run_data_{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{n_sensors_keep}_eps{epochs}.txt"
                     with open(run_data_file_path, 'a') as file:
                         file.write(f'Training duration: {duration}\n')
                         file.write(f'No. of epochs: {epochs}\n')

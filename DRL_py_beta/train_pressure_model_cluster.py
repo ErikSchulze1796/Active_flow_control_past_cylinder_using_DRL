@@ -49,9 +49,9 @@ def main():
                     # samples = data[idx]
                     # data = samples
                     
-                    data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
-                    data_labeled = generate_labeled_data(data_norm, n_steps_history, every_nth_element)
-                    train_data, val_data, test_data = split_data(data_labeled)
+                    data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
+                    train_data_unscaled, val_data_unscaled, test_data_unscaled = split_data(data_labeled)
+                    train_data, val_data, test_data, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(train_data_unscaled, val_data_unscaled, test_data_unscaled)
                     # data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
                     # train_data, val_data, test_data = split_data(data_labeled)
                     
@@ -60,14 +60,14 @@ def main():
                     ######################################
                     # DATA SHAPE: t, p400, cd, cl, omega
                     
-                    p_min = pt.min(data[:, :,1:-3])
-                    p_max = pt.max(data[:, :,1:-3])
-                    c_d_min = pt.min(data[:,:,-3])
-                    c_d_max = pt.max(data[:,:,-3])
-                    c_l_min = pt.min(data[:,:,-2])
-                    c_l_max = pt.max(data[:,:,-2])
-                    omega_min = pt.min(data[:, :,-1])
-                    omega_max = pt.max(data[:, :,-1])
+                    # p_min = pt.min(data[:, :,1:-3])
+                    # p_max = pt.max(data[:, :,1:-3])
+                    # c_d_min = pt.min(data[:,:,-3])
+                    # c_d_max = pt.max(data[:,:,-3])
+                    # c_l_min = pt.min(data[:,:,-2])
+                    # c_l_max = pt.max(data[:,:,-2])
+                    # omega_min = pt.min(data[:, :,-1])
+                    # omega_max = pt.max(data[:, :,-1])
                     model_params = {
                         "n_inputs": n_steps_history * n_inputs,
                         "n_outputs": output,
@@ -76,15 +76,16 @@ def main():
                         "activation": pt.nn.ReLU(),
                         "n_steps": n_steps_history,
                         "n_p_sensors": n_sensors_keep,
-                        "p_min": p_min,
-                        "p_max": p_max,
-                        "c_d_min": c_d_min,
-                        "c_d_max": c_d_max,
-                        "c_l_min": c_l_min,
-                        "c_l_max": c_l_max,
-                        "omega_min": omega_min,
-                        "omega_max": omega_max
                     }
+                    #     "p_min": p_min,
+                    #     "p_max": p_max,
+                    #     "c_d_min": c_d_min,
+                    #     "c_d_max": c_d_max,
+                    #     "c_l_min": c_l_min,
+                    #     "c_l_max": c_l_max,
+                    #     "omega_min": omega_min,
+                    #     "omega_max": omega_max
+                    # }
 
                     model = FFNN(**model_params)
                     save_model_in = f"training_pressure_model/thesis_quality/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{n_sensors_keep}_eps{epochs}/"
@@ -101,7 +102,7 @@ def main():
                                                         epochs=epochs, save_best=save_model_in, lr=lr)
                     end = datetime.datetime.now()
                     duration = end - start
-                    run_data_file_path = save_model_in + f"run_data_{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{every_nth_element}_eps{epochs}.txt"
+                    run_data_file_path = save_model_in + f"run_data_{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{n_sensors_keep}_eps{epochs}.txt"
                     with open(run_data_file_path, 'a') as file:
                         file.write(f'Training duration: {duration}\n')
                         file.write(f'No. of epochs: {epochs}\n')
