@@ -44,7 +44,7 @@ def evaluate_model(model: pt.nn.Module,
     prediction_p = pt.zeros(labels_norm[:,:-2].shape)
     prediction_cd = pt.zeros(labels_norm[:,-2].shape)
     prediction_cl = pt.zeros(labels_norm[:,-1].shape)
-    model.load_state_dict((pt.load(model_path)))
+    # model.load_state_dict((pt.load(model_path)))
     full_pred_norm = pt.zeros(labels_norm.shape)
     for idx_t, state_t in enumerate(features_norm):
 

@@ -56,7 +56,7 @@ class MinMaxScaler(object):
             Scaled/normalized data
         """
         assert self.trained
-        assert len(data.shape) == 3 # Assert dimension of input data
+        # assert len(data.shape) == 3 # Assert dimension of input data
         data_norm = (data - self.min) / (self.max - self.min)
         return 2.0*data_norm - 1.0 # Scale between [-1, 1]
 
@@ -259,7 +259,7 @@ def split_sequence(data, n_steps_history: int, every_nth_element: int):
 
     return current_t, next_t
 
-def split_data(data: pt.Tensor, test_portion_rel: float=0.20, val_portion_rel: float=0.10):
+def split_data(data: pt.Tensor, val_portion_rel: float=0.10):
     """Splits data into train, validation and test set
 
     Parameters
@@ -277,19 +277,16 @@ def split_data(data: pt.Tensor, test_portion_rel: float=0.20, val_portion_rel: f
         Tuple(list(torch.Tensor, torch.Tensor), list(torch.Tensor, torch.Tensor), list(torch.Tensor, torch.Tensor))
         A tuple of three lists storing pairs of feature and label tensors for training, validation and test
     """
-    test_portion_abs = round(test_portion_rel * data[0].shape[0])
     val_portion_abs = round(val_portion_rel * data[0].shape[0])
-    train_portion_abs = data[0].shape[0] - val_portion_abs - test_portion_abs
+    train_portion_abs = data[0].shape[0] - val_portion_abs
     #print(f"Absolute size of test set: {test_portion_abs}")
     #print(f"Absolute size of validation set: {val_portion_abs}")
     #print(f"Absolute size of training set: {train_portion_abs}")
-    assert (test_portion_abs + val_portion_abs + train_portion_abs) == data[0].shape[0]
+    assert (val_portion_abs + train_portion_abs) == data[0].shape[0]
 
 
     # select snapshots for testing
     probs = pt.ones(data[0].shape[0])
-    test_idx = pt.multinomial(probs, test_portion_abs)
-    probs[test_idx] = 0.0
     val_idx = pt.multinomial(probs, val_portion_abs)
     probs[val_idx] = 0.0
     train_idx = pt.multinomial(probs, train_portion_abs)
@@ -297,11 +294,9 @@ def split_data(data: pt.Tensor, test_portion_rel: float=0.20, val_portion_rel: f
     #print("Validation snapshots: ", val_idx)
     #print("Training snapshots: ", train_idx)
 
-    test_data_features = data[0][test_idx, :]
-    test_data_labels = data[1][test_idx, :]
     val_data_features = data[0][val_idx, :]
     val_data_labels = data[1][val_idx, :]
     train_data_features = data[0][train_idx, :]
     train_data_labels = data[1][train_idx, :]
     
-    return [train_data_features, train_data_labels], [val_data_features, val_data_labels], [test_data_features, test_data_labels]
+    return [train_data_features, train_data_labels], [val_data_features, val_data_labels]

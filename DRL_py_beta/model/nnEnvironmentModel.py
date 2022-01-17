@@ -70,31 +70,48 @@ class WrapperModel(torch.nn.Module):
         self._clrange = clmax - clmin
         self._n_sensors = n_sensors
         self._n_steps = n_steps
+        self.input_scaled = True
+        self.output_rescaled = True
 
+    @torch.jit.ignore
     def scale(self, x):
-        
+        if self.input_scaled == False:
+            return x
+
         for step in range(self._n_steps):
             start_p = int(step * (self._n_sensors+1))
             end_p = int(start_p + self._n_sensors)
             # Pressure scaling
-            x[:,:,start_p:end_p] = (x[:,:,start_p:end_p] - self._pmin) / self._prange
+            x[start_p:end_p] = (x[start_p:end_p] - self._pmin) / self._prange
             # Omega scaling
-            x[:,:,end_p] = (x[:,:,end_p] - self._omegamin) / self._omegarange
-            x = 2.0 * x - 1.0
-            
-        return x
+            x[end_p] = (x[end_p] - self._omegamin) / self._omegarange
+        x = 2.0 * x - 1.0
         
+        return x
+
+    @torch.jit.ignore
     def rescale(self, x):
+        if self.output_rescaled == False:
+            return x
+        
         x = (x + 1.0) * 0.5
         # Pressure rescaling
-        x[:,:,:-2] = x[:,:,:-2] * self._prange + self._pmin
+        x[:-2] = x[:-2] * self._prange + self._pmin
         # c_d rescaling
-        x[:,:,-2] = x[:,:,-2] * self._cdrange + self._cdmin
+        x[-2] = x[-2] * self._cdrange + self._cdmin
         # c_l rescaling
-        x[:,:,-1] = x[:,:,-1] * self._clrange + self._clmin
+        x[-1] = x[-1] * self._clrange + self._clmin
 
         return x
-    
+
+    @torch.jit.ignore
+    def input_scaling(self, input_scaled: bool):
+        self.input_scaled = input_scaled
+
+    @torch.jit.ignore
+    def output_rescaling(self, output_rescaled: bool):
+        self.output_rescaled = output_rescaled
+
     def forward(self, x):
         x = self.scale(x)
         x = self._model(x)

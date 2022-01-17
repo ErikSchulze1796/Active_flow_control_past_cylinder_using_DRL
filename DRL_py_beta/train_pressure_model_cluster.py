@@ -11,7 +11,7 @@ import torch as pt
 
 from model.nnEnvironmentModel import FFNN
 from model.model_training import optimize_model
-from model.preprocessing.preprocessing import data_scaling, generate_labeled_data, split_data
+from model.preprocessing.preprocessing import data_scaling, generate_labeled_data, split_data, MinMaxScaler
 from model.model_evaluation import evaluate_model
 from plotting.plot_data import plot_loss, plot_evaluation, plot_feature_space_error_map
 
@@ -20,7 +20,7 @@ def main():
     # Seeding
     pt.manual_seed(0)
 
-    location = "training_pressure_model/initial_trajectories/initial_trajectory_data_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
+    location = "DRL_py_beta/training_pressure_model/initial_trajectories/initial_trajectory_data_train_set_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
     data = pt.load(location)
     
     # Grid search setup
@@ -52,7 +52,7 @@ def main():
                     
                     data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
                     data_labeled = generate_labeled_data(data_norm, n_steps_history, every_nth_element)
-                    train_data, val_data, test_data = split_data(data_labeled)
+                    train_data, val_data = split_data(data_labeled)
                     # data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
                     # train_data, val_data, test_data = split_data(data_labeled)
                     
@@ -61,14 +61,6 @@ def main():
                     ######################################
                     # DATA SHAPE: t, p400, cd, cl, omega
                     
-                    # p_min = pt.min(data[:, :,1:-3])
-                    # p_max = pt.max(data[:, :,1:-3])
-                    # c_d_min = pt.min(data[:,:,-3])
-                    # c_d_max = pt.max(data[:,:,-3])
-                    # c_l_min = pt.min(data[:,:,-2])
-                    # c_l_max = pt.max(data[:,:,-2])
-                    # omega_min = pt.min(data[:, :,-1])
-                    # omega_max = pt.max(data[:, :,-1])
                     model_params = {
                         "n_inputs": n_steps_history * n_inputs,
                         "n_outputs": output,
@@ -89,7 +81,7 @@ def main():
                     # }
 
                     model = FFNN(**model_params)
-                    save_model_in = f"training_pressure_model/thesis_quality/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{n_sensors_keep}_eps{epochs}/"
+                    save_model_in = f"DRL_py_beta/training_pressure_model/thesis_quality/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{n_sensors_keep}_eps{epochs}/"
                     if not isdir(save_model_in):
                         makedirs(save_model_in)
                     
@@ -115,7 +107,8 @@ def main():
                         file.write(f'No. of trajectories: {len(data)}\n')
                         file.write(f'No. of pressure sensors as input: {n_sensors_keep}\n')
 
-                    # # Min/Max Scaler wrapper model
+
+                    # Min/Max Scaler wrapper model
                     # wrapper = WrapperModel(model,
                     #                        p_min, p_max,
                     #                        omega_min, omega_max,
@@ -142,7 +135,43 @@ def main():
                                 save_plots_in=save_model_in, show=False)
 
                     model_path = "{}best_model_train_{}_n_history{}_neurons{}_layers{}.pt".format(save_model_in, lr, n_steps_history, model_params["n_neurons"], model_params["n_layers"])
+                    test_data_path = "DRL_py_beta/training_pressure_model/initial_trajectories/initial_trajectory_data_test_set_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
+
+                    from model.nnEnvironmentModel import WrapperModel
+                    p_min = -1.6963981
+                    p_max = 2.028614
+                    c_d_min = 2.9635367
+                    c_d_max = 3.4396918
+                    c_l_min = -1.8241948
+                    c_l_max = 1.7353026
+                    omega_min = -9.999999
+                    omega_max = 10.0
+                    # Min/Max Scaler wrapper model
+                    model.load_state_dict(pt.load(model_path))
+                    wrapper = WrapperModel(model,
+                                           p_min, p_max,
+                                           omega_min, omega_max,
+                                           c_d_min, c_d_max,
+                                           c_l_min, c_l_max,
+                                           n_steps_history,
+                                           n_sensors_keep)
+                    # wrapper.output_rescaling(False)
+
+                    test_data = pt.load(test_data_path)
+                    scaler_pressure = MinMaxScaler()
+                    scaler_pressure.fit(pt.Tensor([p_min, p_max]))
+                    # test_data[:,:,1:-3] = scaler_pressure.scale(test_data[:,:,1:-3])
+                    scaler_cd = MinMaxScaler()
+                    scaler_cd.fit(pt.Tensor([c_d_min, c_d_max]))
+                    # test_data[:,:,-3] = scaler_cd.scale(test_data[:,:,-3])
+                    scaler_cl = MinMaxScaler()
+                    scaler_cl.fit(pt.Tensor([c_l_min, c_l_max]))
+                    # test_data[:,:,-2] = scaler_cl.scale(test_data[:,:,-2])
+                    scaler_omega = MinMaxScaler()
+                    scaler_omega.fit(pt.Tensor([omega_min, omega_max]))
+                    # test_data[:,:,-1] = scaler_omega.scale(test_data[:,:,-1])
                     
+                    test_data = generate_labeled_data(test_data, n_steps_history, every_nth_element)
                     #idx_test_trajectory = 1
                     perm = pt.randperm(test_data[0].size(0))
                     k = 1
@@ -151,7 +180,7 @@ def main():
                     test_features_norm = test_data[0][idx_test_trajectory,:,:].squeeze()
                     test_labels_norm = test_data[1][idx_test_trajectory,:,:].squeeze()
                     
-                    test_loss_l2, test_loss_lmax, r2score, prediction_p, prediction_cd, prediction_cl = evaluate_model(model,
+                    test_loss_l2, test_loss_lmax, r2score, prediction_p, prediction_cd, prediction_cl = evaluate_model(wrapper,
                                                                                                                        test_features_norm,
                                                                                                                        test_labels_norm,
                                                                                                                        model_path,
@@ -168,6 +197,7 @@ def main():
                     # prediction_p = scaler_pressure.rescale(prediction_p)
                     prediction_cd = scaler_cd.rescale(prediction_cd)
                     prediction_cl = scaler_cl.rescale(prediction_cl)
+
 
                     plot_evaluation(time_steps,
                                     labels_cd,
