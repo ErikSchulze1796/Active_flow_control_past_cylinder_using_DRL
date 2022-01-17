@@ -30,9 +30,11 @@ def main():
     neurons_space = [50]
     steps_space = [4]
     n_sensors = 400
+    # Keep only every nth pressure sensor of input state
     every_nth_element = 25
     n_sensors_keep = int(n_sensors / every_nth_element)
     assert n_sensors % every_nth_element == 0, "You can only keep an even number of sensors!"
+    # n_inputs = no. of p sensors / every_nth_element + omega value
     n_inputs = int(400 / every_nth_element + 1)
     output = 400 + 2
     batch_size = 5
@@ -49,9 +51,9 @@ def main():
                     data = samples
                     
                     # data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
-                    data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
-                    train_data_unscaled, val_data_unscaled, test_data_unscaled = split_data(data_labeled)
-                    train_data, val_data, test_data, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(train_data_unscaled, val_data_unscaled, test_data_unscaled)
+                    data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
+                    data_labeled = generate_labeled_data(data_norm, n_steps_history, every_nth_element)
+                    train_data, val_data, test_data = split_data(data_labeled)
                     # data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
                     # train_data, val_data, test_data = split_data(data_labeled)
                     

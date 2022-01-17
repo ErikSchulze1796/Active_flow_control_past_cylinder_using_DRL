@@ -70,7 +70,7 @@ class WrapperModel(torch.nn.Module):
         self._clrange = clmax - clmin
         self._n_sensors = n_sensors
         self._n_steps = n_steps
-    
+
     def scale(self, x):
         
         for step in range(self._n_steps):

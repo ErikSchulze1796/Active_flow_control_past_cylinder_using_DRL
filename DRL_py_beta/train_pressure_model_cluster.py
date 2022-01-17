@@ -23,7 +23,7 @@ def main():
     location = "training_pressure_model/initial_trajectories/initial_trajectory_data_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
     data = pt.load(location)
     
-    # Grid search set, up
+    # Grid search setup
     epochs = 10000
     learning_rates_space = [0.0001]
     hidden_layers_space = [5]
@@ -34,6 +34,7 @@ def main():
     every_nth_element = 25
     n_sensors_keep = int(n_sensors / every_nth_element)
     assert n_sensors % every_nth_element == 0, "You can only keep an even number of sensors!"
+    # n_inputs = no. of p sensors / every_nth_element + omega value
     n_inputs = int(400 / every_nth_element + 1)
     output = 400 + 2
     batch_size = 32
@@ -49,9 +50,9 @@ def main():
                     # samples = data[idx]
                     # data = samples
                     
-                    data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
-                    train_data_unscaled, val_data_unscaled, test_data_unscaled = split_data(data_labeled)
-                    train_data, val_data, test_data, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(train_data_unscaled, val_data_unscaled, test_data_unscaled)
+                    data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
+                    data_labeled = generate_labeled_data(data_norm, n_steps_history, every_nth_element)
+                    train_data, val_data, test_data = split_data(data_labeled)
                     # data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
                     # train_data, val_data, test_data = split_data(data_labeled)
                     
