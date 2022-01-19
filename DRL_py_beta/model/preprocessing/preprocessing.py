@@ -77,7 +77,15 @@ class MinMaxScaler(object):
         data = (data_norm + 1.0) * 0.5
         return data * (self.max - self.min) + self.min
 
-def data_scaling(data):
+def data_scaling(data,
+                p_min = -1.6963981,
+                p_max = 2.028614,
+                c_d_min = 2.9635367,
+                c_d_max = 3.4396918,
+                c_l_min = -1.8241948,
+                c_l_max = 1.7353026,
+                omega_min = -9.999999,
+                omega_max = 10.0):
     """Conducts input data preprocessing (i.e. min-max scaling, train, val, test set splitting etc.)
     Parameters
     ----------
@@ -97,31 +105,36 @@ def data_scaling(data):
     scaler_omega: MinMaxScaler
         Scaler object for omega min/max scaling
     """
+
     # Normalize data
     data_norm = pt.Tensor(data)
 
     # Scale pressure values to min-max-scale but only using the training set
     scaler_pressure = MinMaxScaler()
     # Scale pressure data
-    scaler_pressure.fit(data_norm[:, :,1:-3])
+    # scaler_pressure.fit(data_norm[:, :,1:-3])
+    scaler_pressure.fit(pt.Tensor([p_min, p_max]))
     data_norm[:, :, 1:-3] = scaler_pressure.scale(data_norm[:, :,1:-3])
 
     # Scale cd values to min-max-scale but only using the training set
     scaler_cd = MinMaxScaler()
     # Scale cd data
-    scaler_cd.fit(data_norm[:, :,-3])
+    # scaler_cd.fit(data_norm[:, :,-3])
+    scaler_cd.fit(pt.Tensor([c_d_min, c_d_max]))
     data_norm[:, :,-3] = scaler_cd.scale(data_norm[:, :,-3].unsqueeze(dim=0))
 
     # Scale cl values to min-max-scale but only using the training set
     scaler_cl = MinMaxScaler()
     # Scale cl data
-    scaler_cl.fit(data_norm[:, :,-2])
+    # scaler_cl.fit(data_norm[:, :,-2])
+    scaler_cl.fit(pt.Tensor([c_l_min, c_l_max]))
     data_norm[:, :,-2] = scaler_cl.scale(data_norm[:, :,-2].unsqueeze(dim=0))
     
     # Scale omega values to min-max-scale but only using the training set
     scaler_omega = MinMaxScaler()
     # Scale omega data
-    scaler_omega.fit(data_norm[:, :,-1])
+    # scaler_omega.fit(data_norm[:, :,-1])
+    scaler_omega.fit(pt.Tensor([omega_min, omega_max]))
     data_norm[:, :,-1] = scaler_omega.scale(data_norm[:, :,-1].unsqueeze(dim=0))
 
     return data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega
