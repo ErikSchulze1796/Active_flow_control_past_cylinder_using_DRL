@@ -73,7 +73,7 @@ module load singularity/3.6.0rc2
 singularity shell of_v2012.sif
 # now we are operating from inside the container
 source /usr/lib/openfoam/openfoam2012/etc/bashrc
-cd /DRL_py/agentRotatingWallVelocity/
+cd /DRL_py_beta/agentRotatingWallVelocity/
 wmake
 ```
 
