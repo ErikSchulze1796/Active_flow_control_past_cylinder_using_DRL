@@ -93,7 +93,32 @@ class FCCA(nn.Module):
         entropies = dist.entropy()
 
         return logpas, entropies
+    
+    @torch.jit.ignore
+    def select_action(self, states):
+        """Samples an action given the states using the policy network
 
+        Parameters
+        ----------
+        states : numpy.array
+            400 pressure values
+
+        Returns
+        -------
+        float
+            Action sampled from the policy network
+        """
+        # Get alpha and beta coefficients of action for the supplied state
+        output_layer = self.forward(torch.from_numpy(states))
+        alpha, beta = output_layer[:, :, 0], output_layer[:, :, 1]
+        alpha = alpha.squeeze()
+        beta = beta.squeeze()
+        # Get beta distribution
+        dist = torch.distributions.Beta(alpha.exp(), beta.exp())
+        # Sample action from distribution
+        action = dist.sample()
+        return action.detach().cpu().item()
+    
 
 class FCV(nn.Module):
     """

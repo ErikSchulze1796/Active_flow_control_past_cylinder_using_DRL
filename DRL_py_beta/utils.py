@@ -66,3 +66,33 @@ def get_random_control_start_time(simulation_re=100, lowerControlThreshold=None,
     startTime = new_snapshotList[index]
 
     return startTime, index
+
+def cat_prediction_feature_vector(p_states: torch.Tensor, actions: torch.Tensor):
+    """Concatenate states to an extended feature vector
+
+    Parameters
+    ----------
+    p_states : list
+        States containing the pressure values
+    actions : list
+        Contains action values per state
+
+    Returns
+    -------
+    torch.Tensor
+        Concatenated feature tensor
+    """
+    
+    # Initialize feature vector
+    feature_vector = torch.Tensor()
+    for n, state in enumerate(p_states):
+        n_state = torch.cat((state, actions[n]), 0)
+        feature_vector = torch.cat((feature_vector, n_state), 0)
+        
+    return feature_vector
+
+p_states = torch.zeros(4,400)
+actions = torch.ones(4,1)
+
+cat_prediction_feature_vector(p_states[:,::25], actions)
+print()

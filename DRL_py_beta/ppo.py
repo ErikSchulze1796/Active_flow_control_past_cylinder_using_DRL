@@ -74,7 +74,9 @@ def train_model(value_model,
     # starting time to calculate time of trajectory run and each iteration of main algorithm
     # getting variable for ppo algorithm from reply_buffer.py
     traj_start_time = time.perf_counter()
-    states, actions, rewards, returns, logpas = fill_buffer(env, sample, n_sensor, gamma, r_1, r_2, r_3, r_4, action_bounds)
+    # states, actions, rewards, returns, logpas = fill_buffer(env, sample, n_sensor, gamma, r_1, r_2, r_3, r_4, action_bounds)
+    states, actions, rewards, returns, logpas = fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, r_3, r_4, 2, 2.5e-4, 4, 25, policy_model)
+
     traj_time = (time.perf_counter() - traj_start_time)
 
     # get V_pi for the state values
