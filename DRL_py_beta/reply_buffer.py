@@ -239,9 +239,9 @@ def fill_buffer(env, sample, n_sensor, gamma, r_1, r_2, r_3, r_4, action_bounds)
 
 def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, r_3, r_4, trajectory_length, delta_t, n_steps, keep_nth_p, policy_model):
     
-    model_path = "model/trained_model/best_model_train_0.0001_n_history4_neurons50_layers4_ep4500.pt"
-    start_states_path = "model/trained_model/100_random_start_states_p16_steps4.pt"
-    start_states_log_p_path = "model/samples/100_random_start_states_p16_steps4_log_probs.pt"
+    model_path = "./model/trained_model/best_model_train_0.0001_n_history4_neurons50_layers4_ep4500.pt"
+    start_states_path = "./model/trained_model/1000_random_start_states_p400_steps4.pt"
+    start_states_log_p_path = "./model/samples/1000_random_start_states_p400_steps4_log_probs.pt"
     
     start_states_data = torch.load(start_states_path)
     start_states_log_p = torch.load(start_states_log_p_path)
