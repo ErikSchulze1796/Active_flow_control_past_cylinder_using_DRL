@@ -1,11 +1,19 @@
 import torch as pt
-from nnEnvironmentModel import FFNN
-from nnEnvironmentModel import WrapperModel
+from model.nnEnvironmentModel import FFNN
+from model.nnEnvironmentModel import WrapperModel
 
 class modelEnv:
+    """Model environment class for use in DRL
+    """
     
     def __init__(self, model_path, **kwargs) -> None:
-        
+        """Constructor of modelEnv class
+
+        Parameters
+        ----------
+        model_path : string
+            Path to environment model
+        """
         self.pmin = kwargs.get("pmin")
         self.pmax = kwargs.get("pmax")
         self.cdmin = kwargs.get("cdmin")
@@ -18,7 +26,7 @@ class modelEnv:
         self.n_sensors = kwargs.get("n_sensors")
         # Instantiate model and load trained parameters from directory
         self.model = FFNN(**kwargs)
-        self.model.load_state_dict((pt.load(model_path)))
+        # self.model.load_state_dict((pt.load(model_path)))
         # Instantiate wrapper model for min/max scaling on the fly
         self.wrapper = WrapperModel(self.model,
                                     self.pmin,
@@ -31,6 +39,19 @@ class modelEnv:
                                     self.clmax,
                                     self.n_steps,
                                     self.n_sensors)
+        self.wrapper.load_state_dict((pt.load(model_path)))
         
     def get_prediction(self, input):
-        return self.wrapper(input)
+        """Returns a prediction using the environment surrogate model
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            Combined input feature tensor for using with the FFNN
+
+        Returns
+        -------
+        torch.Tensor
+            Next predicted state
+        """
+        return self.wrapper(pt.from_numpy(input))

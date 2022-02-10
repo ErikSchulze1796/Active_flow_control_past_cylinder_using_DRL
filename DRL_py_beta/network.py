@@ -110,7 +110,7 @@ class FCCA(nn.Module):
         """
         # Get alpha and beta coefficients of action for the supplied state
         output_layer = self.forward(torch.from_numpy(states))
-        alpha, beta = output_layer[:, :, 0], output_layer[:, :, 1]
+        alpha, beta = output_layer[0], output_layer[1]
         alpha = alpha.squeeze()
         beta = beta.squeeze()
         # Get beta distribution

@@ -2,6 +2,8 @@ import torch as pt
 
 import numpy as np
 
+import pandas as pd
+
 from matplotlib import pyplot as plt
 from matplotlib.ticker import ScalarFormatter
 
@@ -118,6 +120,61 @@ def plot_feature_space_error_map(time_steps, reference, prediction, save_plots_i
     ax.set_ylabel(r"Sensor")
     fig.savefig(f"{save_plots_in}/relative_pressure_error_time_heatmap_lr{lr}_neurons{n_neurons}_nlayers{n_layers}_nhistory{n_steps_history}.png", bbox_inches="tight")
 
+def plot_multiple_feature_space_error_map(time_steps,
+                                        reference,
+                                        predictions,
+                                        save_plots_in: str,
+                                        lr,
+                                        n_neurons,
+                                        n_layers,
+                                        n_steps_history,
+                                        rows: int,
+                                        columns: int):
+    
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    
+    fig, axes = plt.subplots(rows, columns)
+    faxes = axes.ravel()
+    fig.suptitle(f"FFNN Test: Relative Pressure Error per Sensor vs. Time \n LR={lr}, h-Neurons={n_neurons}, h-Layers={n_layers}, Steps={n_steps_history}")
+    plt.rcParams.update({'font.family':'serif'})
+    # Load sensor positions in polar coordinates
+    sensor_positions = pd.read_csv("plotting/centers.csv", sep=" ", header=0)
+
+    p_max_error = 0
+    for idx, time_steps_traj in enumerate(time_steps):
+        error_rel = ((reference[idx] - predictions[idx]) / 2).abs() * 100
+        max_error = pt.max((error_rel))
+        if max_error > p_max_error:
+            p_max_error = max_error
+
+    for idx, time_steps_traj in enumerate(time_steps):
+        error_rel = ((reference[idx] - predictions[idx]) / 2).abs() * 100
+        # Sort sensor errors by position using the polar angle
+        for i, row in enumerate(error_rel):
+            error_rel[i,:] = pt.Tensor([x for _, x in sorted(zip(pt.from_numpy(sensor_positions.polar.values), row), key=lambda pair: pair[0])])
+        
+        error_rel = pt.transpose(error_rel, 0, 1)
+        sensors = pt.linspace(1, 400, 400)
+        
+        pcol = faxes[idx].pcolormesh(time_steps_traj, sensors, error_rel, shading='auto', vmin=0, vmax=p_max_error)
+
+        divider = make_axes_locatable(faxes[idx])
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+
+        fig.colorbar(pcol, cax=cax, label="Rel. Error [%]")
+        
+        faxes[idx].set_xlabel(r"$t^{*}$")
+        faxes[idx].set_ylabel(r"Sensor")
+    
+    if (len(predictions) % 2) != 0:
+        fig.delaxes(faxes[-1])
+
+    fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.8, hspace=0.5)
+
+    fig.savefig(f"{save_plots_in}/relative_pressure_error_time_heatmap_lr{lr}_neurons{n_neurons}_nlayers{n_layers}_nhistory{n_steps_history}.png", bbox_inches="tight")
+
+
 def plot_evaluation(time_steps, labels_cd, prediction_cd, labels_cl, prediction_cl, test_loss_l2, test_loss_lmax, r2score, save_plots_in: str, lr: float, neurons: int, hidden_layers: int, n_steps_history: int):
 
     fig, ax = plt.subplots(3,1)
@@ -202,3 +259,113 @@ def plot_evaluation(time_steps, labels_cd, prediction_cd, labels_cl, prediction_
     
     fig.tight_layout()
     fig.savefig(f"{save_plots_in}/cdclprediction_lr{lr}_neurons{neurons}_nlayers{hidden_layers}_nhistory{n_steps_history}.svg", bbox_inches="tight")
+
+def plot_evaluation_multiple_trajectories(time_steps,
+                                          l2,
+                                          lmax,
+                                          r2,
+                                          labels_cd,
+                                          labels_cl,
+                                          predictions_cd,
+                                          predictions_cl,
+                                          save_plots_in: str,
+                                          lr: float,
+                                          neurons: int,
+                                          hidden_layers: int,
+                                          n_steps_history: int,
+                                          rows: int,
+                                          columns: int):
+        
+    fig, ax = plt.subplots(rows, columns)
+    font = {'fontname': 'serif'}
+    plt.rcParams.update({'font.family':'serif'})
+    plt.rcParams["mathtext.fontset"] = "dejavuserif"
+
+    fig.suptitle(f"FFNN Test Performance \n LR={lr}, h-Neurons={neurons}, h-Layers={hidden_layers}, Steps={n_steps_history}", **font, y=1.02)
+
+    for idx, time_steps_traj in enumerate(time_steps):
+        
+        ax[idx][0].plot(time_steps_traj, l2[idx], linewidth=1.0, c="b", label=r"$L_2$ loss")
+        ax[idx][1].plot(time_steps_traj, lmax[idx], linewidth=1.0, c="g", label=r"$L_{max}$ loss")
+        ax[idx][2].plot(time_steps_traj, r2[idx], linewidth=1.0, c="r", label="R² score")
+
+        ax[idx][0].set_ylabel(r"$L_2$ loss", **font)
+        ax[idx][1].set_ylabel(r"$L_{max}$ loss", **font)
+        ax[idx][2].set_ylabel("R² score", **font)
+
+        ax[idx][0].get_yaxis().set_label_coords(-0.54,0.5)
+        ax[idx][1].get_yaxis().set_label_coords(-0.4,0.5)
+        ax[idx][2].get_yaxis().set_label_coords(-0.54,0.5)
+
+        # ax[0].legend(prop={'size': 9, 'family':'serif'})#, loc="right")
+        # ax[1].legend(prop={'size': 9, 'family':'serif'})#, loc="right")
+        # ax[2].legend(prop={'size': 9, 'family':'serif'})#, loc="right")
+
+        ax[idx][0].grid()
+        ax[idx][1].grid()
+        ax[idx][2].grid()
+        ax[idx][0].set_xlabel(r"$t^{*}$", **font)
+        ax[idx][1].set_xlabel(r"$t^{*}$", **font)
+        ax[idx][2].set_xlabel(r"$t^{*}$", **font)
+
+    for axis1 in ax:
+        for axis2 in axis1:
+            for tick in axis2.get_xticklabels():
+                tick.set_fontname("serif")
+            for tick in axis2.get_yticklabels():
+                tick.set_fontname("serif")
+
+    ax_handles = []
+    ax_labels = []
+    for axis2 in ax[0]:
+        handle, label = axis2.get_legend_handles_labels()
+        ax_handles.extend(handle)
+        ax_labels.extend(label)
+
+    fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.7, hspace=0.5)
+
+    fig.legend(ax_handles, ax_labels, loc='upper center', bbox_to_anchor=(0.5, 0.96), ncol=3)
+    fig.savefig(f"{save_plots_in}evalutation_lr{lr}_neurons{neurons}_nlayers{hidden_layers}_nhistory{n_steps_history}.svg", bbox_inches="tight")
+    
+    # Plotting for cd and cl predicitons
+
+    fig, ax = plt.subplots(rows,columns-1)
+    fig.suptitle(f"FFNN Test Prediction \n LR={lr}, Neurons={neurons}, Hidden Layers={hidden_layers}, Steps={n_steps_history}", **font, y=1.06)
+
+    for idx, time_steps_traj in enumerate(time_steps):
+
+        ax[idx][0].plot(time_steps_traj, predictions_cd[idx], label=r"pred. drag $c_D$", c="C3", ls="--", linewidth=1.0)
+        ax[idx][0].plot(time_steps_traj, labels_cd[idx], label=r"real drag $c_D$", c="k", linewidth=1.0)
+        ax[idx][1].plot(time_steps_traj, predictions_cl[idx], label=r"pred. lift $c_L$", c="C1", ls="--", linewidth=1.0)
+        ax[idx][1].plot(time_steps_traj, labels_cl[idx], label=r"real lift $c_L$", c="b", linewidth=1.0)
+
+        ax[idx][0].set_ylabel(r"$c_D$", **font)
+        ax[idx][1].set_ylabel(r"$c_L$", **font)
+
+        ax[idx][0].get_yaxis().set_label_coords(-0.25,0.5)
+        ax[idx][1].get_yaxis().set_label_coords(-0.2,0.5)
+
+        ax[idx][0].grid()
+        ax[idx][1].grid()
+
+    ax[-1][0].set_xlabel(r"$t^{*}$", **font)
+    ax[-1][1].set_xlabel(r"$t^{*}$", **font)
+
+    for axis1 in ax:
+        for axis2 in axis1:
+            for tick in axis2.get_xticklabels():
+                tick.set_fontname("serif")
+            for tick in axis2.get_yticklabels():
+                tick.set_fontname("serif")
+
+    ax_handles = []
+    ax_labels = []
+    for axis2 in ax[0]:
+        handle, label = axis2.get_legend_handles_labels()
+        ax_handles.extend(handle)
+        ax_labels.extend(label)
+
+    fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.28, hspace=0.5)
+
+    fig.legend(ax_handles, ax_labels, loc='upper center', bbox_to_anchor=(0.5, 0.995), ncol=2)
+    fig.savefig(f"{save_plots_in}cdclprediction_lr{lr}_neurons{neurons}_nlayers{hidden_layers}_nhistory{n_steps_history}.svg", bbox_inches="tight")

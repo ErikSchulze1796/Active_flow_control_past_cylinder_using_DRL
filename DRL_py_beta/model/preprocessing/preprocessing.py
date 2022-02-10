@@ -13,6 +13,42 @@ class MinMaxScaler(object):
         self.min = None
         self.max = None
         self.trained = False
+        self.p_min = -1.6963981
+        self.p_max = 2.028614
+        self.c_d_min = 2.9635367
+        self.c_d_max = 3.4396918
+        self.c_l_min = -1.8241948
+        self.c_l_max = 1.7353026
+        self.omega_min = -9.999999
+        self.omega_max = 10.0
+    
+    def scale_features(self, data):
+        assert len(data.shape) == 2, f"Expected data to have dimension of 2, got {len(data.shape)}"
+        data[:,:-1] = (data[:,:-1] - self.p_min) / (self.p_max - self.p_min)
+        data[:,-1] = (data[:,-1] - self.omega_min) / (self.omega_max - self.omega_min)
+        return 2.0*data - 1.0 # Scale between [-1, 1]
+    
+    def scale_labels(self, data):
+        assert len(data.shape) == 2, f"Expected data to have dimension of 2, got {len(data.shape)}"
+        data[:,:-2] = (data[:,:-2] - self.p_min) / (self.p_max - self.p_min)
+        data[:,-2] = (data[:,-2] - self.c_d_min) / (self.c_d_max - self.c_d_min)
+        data[:,-1] = (data[:,-1] - self.c_l_min) / (self.c_l_max - self.c_l_min)
+        return 2.0*data - 1.0 # Scale between [-1, 1]
+
+    def rescale_features(self, data):
+        assert len(data.shape) == 2, f"Expected data to have dimension of 2, got {len(data.shape)}"
+        data = (data + 1.0) * 0.5
+        data[:,:-1] = data[:,:-1] * (self.p_max - self.p_min) + self.p_min
+        data[:,-1] = data[:,-1] * (self.omega_max - self.omega_min) + self.omega_min
+        return data
+    
+    def rescale_labels(self, data):
+        assert len(data.shape) == 2, f"Expected data to have dimension of 2, got {len(data.shape)}"
+        data = (data + 1.0) * 0.5
+        data[:,:-2] = data[:,:-2] * (self.p_max - self.p_min) + self.p_min
+        data[:,-2] = data[:,-2] * (self.c_d_max - self.c_d_min) + self.c_d_min
+        data[:,-1] = data[:,-1] * (self.c_l_max - self.c_l_min) + self.c_l_min
+        return data
 
     def fit(self, data):
         """Stores min and max values of given data

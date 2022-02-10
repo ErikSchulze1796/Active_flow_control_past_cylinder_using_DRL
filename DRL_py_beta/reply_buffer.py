@@ -8,7 +8,7 @@
 from read_trajectory_data import *
 from cal_R_gaes import *
 from check_traj import *
-from utils import cat_prediction_feature_vector
+from utils import cat_prediction_feature_vector, write_model_generated_trajectory_data_to_file
 
 # If machine = 'local' then the functions from env_local will be imported
 # If machine = 'cluster' then the functions from env_cluster will be imported
@@ -238,33 +238,29 @@ def fill_buffer(env, sample, n_sensor, gamma, r_1, r_2, r_3, r_4, action_bounds)
 #     return state_buffer, action_buffer, reward_buffer, return_buffer, log_prob_buffer
 
 def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, r_3, r_4, trajectory_length, delta_t, n_steps, keep_nth_p, policy_model):
-    
-    model_path = "./model/trained_model/best_model_train_0.0001_n_history4_neurons50_layers4_ep4500.pt"
-    start_states_path = "./model/trained_model/1000_random_start_states_p400_steps4.pt"
-    start_states_log_p_path = "./model/samples/1000_random_start_states_p400_steps4_log_probs.pt"
-    
-    start_states_data = torch.load(start_states_path)
-    start_states_log_p = torch.load(start_states_log_p_path)
 
+    # if sample > 0:
+    #     policy_model_path = f"./results/models/no_torchscript/policy_{sample-1}.pt"
+    #     policy_model.load_state_dict(torch.load(policy_model_path))
+    #     # policy_model = torch.jit.load(policy_model_path+f"policy_{sample-1}.pt")
 
+    model_path = f"model/trained_model/best_model_train_0.0001_n_history{n_steps}_neurons50_layers5.pt"
+    start_states_path = f"model/samples/1000_random_start_states_p400_steps{n_steps}.pt"
+    start_states_log_p_path = f"model/samples/1000_random_start_states_p400_steps{n_steps}_log_probs.pt"
+    
+    all_start_states_trajectory = torch.load(start_states_path)
+    all_start_states_log_p = torch.load(start_states_log_p_path)
+    probs = torch.ones(all_start_states_trajectory.shape[0])
+    idxes = torch.multinomial(probs, 10)
+    
+    start_states_trajectory = all_start_states_trajectory[idxes]
+    start_states_log_p = all_start_states_log_p[idxes]
+    
     # To check if the trajectories is sampled
-    n_traj = start_states_data.shape[0]
+    n_traj = start_states_trajectory.shape[0]
     assert n_traj > 0
-    
-    # # To extract the length of trajectory
-    # t_traj = pd.read_csv(traj_files[0] + "trajectory.csv", sep=",", header=0)
-    # n_T = len(t_traj.t.values)
 
-    # # due to delayed starting behaviour the time steps set to explicit -> length of trajectory
-    # # choose shortest available trajectory to ensure the same length
-    # for i, files in enumerate(traj_files):
-    #     # To extract the length of trajectory
-    #     t_traj = pd.read_csv(traj_files[i] + "trajectory.csv", sep=",", header=0)
-    #     n_T_temp = len(t_traj.t.values)
-    #     if n_T_temp < n_T:
-    #         n_T = n_T_temp
-
-    n_T = trajectory_length / delta_t
+    n_T = int(trajectory_length / (20 * delta_t) - 1)
 
     # buffer initialization
     state_buffer = np.zeros((n_traj, n_T, n_sensor))
@@ -283,74 +279,96 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
                         "clmax" : 1.7353026,
                         "omegamin" : -9.999999,
                         "omegamax" : 10.0,
-                        "n_steps" : 4,
-                        "n_sensors" : 16
+                        "n_steps" : n_steps,
+                        "n_sensors" : int(400 / keep_nth_p),
+                        "n_inputs" : (n_steps * (int((400 / keep_nth_p)+1))),
+                        "n_outputs" : 402,
+                        "n_layers" : 5,
+                        "n_neurons" : 50,
+                        "activation" : torch.nn.ReLU()
     }
     model = modelEnv(model_path, **model_parameters)
 
-    for i, start_state in enumerate(start_states_data):
+    for i, start_state in enumerate(start_states_trajectory):
         # get the data from stored example tensor
-        coeff_data = np.ndarray(start_state[:,0].detach().cpu().numpy(),
-                                start_state[:,-3].detach().cpu().numpy(),
-                                start_state[:,-2].detach().cpu().numpy())
+        coeff_data = np.column_stack((start_state[:,0].detach().cpu().numpy().astype(float),
+                                        start_state[:,-3].detach().cpu().numpy().astype(float),
+                                        start_state[:,-2].detach().cpu().numpy().astype(float)))
         
         # state values from stored example tensor
-        states = start_state[:,1:-3].detach().cpu().numpy()
+        # start_state shape: t, p1-p400, c_d, c_l, omega
+        states = start_state[:,1:-3].detach().cpu().numpy().astype(float)
 
         # action values from stored example tensor
-        actions_ = start_state[:,-1].detach().cpu().numpy()
+        actions_ = start_state[:,-1].detach().cpu().numpy().astype(float)
         
         # rotation rate initialized to zero since not used in reward function
         theta_ = np.zeros(n_steps)
         d_theta = np.zeros(n_steps)
         
        # log_probs from stored example tensor
-        log_probs_ = start_states_log_p[i,:].detach().cpu().numpy()
+        log_probs_ = start_states_log_p[i,:].detach().cpu().numpy().astype(float)
          
-        # At this point the buffers are only filled with the data from the 
-        # first states that are needed for model prediction
+        # At this point only the data from the  first states
+        # that are needed for model prediction are stored.
         ########################## Environment Prediction ##########################
         
+        n_time_steps = int(trajectory_length / delta_t - 1)
+        start_time = coeff_data[0,0]
+
+        time_steps = (np.arange(0,n_time_steps) * delta_t + start_time)[19::20]
         # Environment prediction loop
-        for time_step in range(coeff_data[0,-1], (trajectory_length+delta_t), delta_t):
+        for j, time_step in enumerate(time_steps[n_steps:]):
             
             with torch.no_grad():
-            # Get log probabilities from policy network
-                logpas_pred, entropies_pred = policy_model.get_predictions(states[-1], actions_[-1])
-                log_probs_.append(logpas_pred)
-                
                 # Sample action from policy network
-                action = policy_model.select_action(states[-1])
-                actions_.append(action)
+                action = policy_model.select_action(states[-1,:])
+                actions_ = np.append(actions_, np.array([action]), axis=0)
             
             # Get last n_steps states and actions from all previous states and actions
             feature_states = states[-n_steps:,::keep_nth_p]
             feature_actions = actions_[-n_steps:]
             # Concatenate feature vector using multiple states
             combined_features = cat_prediction_feature_vector(feature_states, feature_actions)
-            
             with torch.no_grad():
                 # Get state, cd and cl prediction from feature vector
-                prediction = model.get_prediction(combined_features).detach().squeeze()
-                
-            states.append(prediction[:-2])
-            coeff_state = [time_step, prediction[-2], prediction[-1]]
-            coeff_data.append(coeff_state)
+                prediction = model.get_prediction(combined_features).detach().cpu().unsqueeze(dim=0).numpy()
+            # Append pressure values to states
+            states = np.append(states, np.squeeze(prediction,axis=1)[:,:-2], axis=0)
+            # Wrap up timestep, c_d, and c_l values for a single state
+            coeff_state = np.array([time_step, np.squeeze(prediction,axis=1)[:,-2], np.squeeze(prediction,axis=1)[:,-1]], dtype=np.single)
+            # Append everything to coefficient_data
+            coeff_data = np.append(coeff_data, np.expand_dims(coeff_state, axis=0), axis=0)
 
             # Since r_3 and r_4 equal zero, theta and d_theta have no effect and can be set to zero for now
             theta_step = 0
             d_theta_step = 0
-            theta_.append(theta_step)
-            d_theta.append(d_theta_step)
+            theta_ = np.append(theta_, np.array([theta_step]), axis=0)
+            d_theta = np.append(d_theta, np.array([d_theta_step]), axis=0)
             
+        #     from matplotlib import pyplot as plt
+        #     # cdplot.append(np.squeeze(prediction)[-2])
+        #     clplot.append(np.squeeze(prediction)[-1])
+        #     plt.plot(cdplot)
+        #     plt.plot(clplot)
+        #     plt.pause(0.05)
+
+        # plt.show()
+
         ########################## Environment Prediction ##########################
         
         # rewards and returns from cal_R_gaes.py -> calculate_rewards_returns
+        coeff_data = pd.DataFrame(coeff_data, columns=["t", "c_d", "c_l"])
         rewards, returns = calculate_rewards_returns(r_1, r_2, r_3, r_4, coeff_data, gamma, theta_, d_theta)
+
+        with torch.no_grad():
+            # Get log probabilities from policy network
+            logpas_pred, _ = policy_model.get_predictions(np.expand_dims(states,axis=0), np.expand_dims(actions_,axis=0))
+            log_probs_ = np.append(log_probs_, logpas_pred.squeeze()[30:], axis=0)
 
         actions = actions_[:-1]
 
-        log_probs = log_probs_[:-1]
+        log_probs = logpas_pred.squeeze()[:-1]# log_probs_[:-1]
 
         # appending values in buffer
         state_buffer[i] = states[:n_T, :]
@@ -358,5 +376,11 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
         reward_buffer[i] = rewards[:n_T]
         return_buffer[i] = returns[:n_T]
         log_prob_buffer[i] = log_probs[:n_T-1]
+        write_model_generated_trajectory_data_to_file(sample,
+                                                      i,
+                                                      np.expand_dims(coeff_data.t.to_numpy(), axis=1),
+                                                      states, np.expand_dims(coeff_data.c_d.to_numpy(), axis=1),
+                                                      np.expand_dims(coeff_data.c_l.to_numpy(), axis=1),
+                                                      np.expand_dims(np.append(actions,0), axis=1))
     
     return state_buffer, action_buffer, reward_buffer, return_buffer, log_prob_buffer

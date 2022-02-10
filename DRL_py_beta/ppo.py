@@ -75,7 +75,7 @@ def train_model(value_model,
     # getting variable for ppo algorithm from reply_buffer.py
     traj_start_time = time.perf_counter()
     # states, actions, rewards, returns, logpas = fill_buffer(env, sample, n_sensor, gamma, r_1, r_2, r_3, r_4, action_bounds)
-    states, actions, rewards, returns, logpas = fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, r_3, r_4, 2, 2.5e-4, 4, 25, policy_model)
+    states, actions, rewards, returns, logpas = fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, r_3, r_4, 2, 2.5e-4, 30, 25, policy_model)
 
     traj_time = (time.perf_counter() - traj_start_time)
 
@@ -124,7 +124,7 @@ def train_model(value_model,
             logpas_pred_all, _ = policy_model.get_predictions(states[:, :-1, :], actions)
             kl = (torch.from_numpy(logpas) - logpas_pred_all).mean()
             if kl.item() > policy_stopping_kl:
-                print(f'kl smaller than tolrence, {q} and {kl.item()}')
+                print(f'kl smaller than tolerance | Policy optim epoch {q} | KL: {kl.item()}')
                 break
 
     model_trace_update(policy_model, sample)
@@ -161,7 +161,7 @@ def train_model(value_model,
             values_pred_all = value_model(torch.from_numpy(states)).squeeze()
             mse = (torch.from_numpy(values_pi) - values_pred_all).pow(2).mul(0.5).mean()
             if mse.item() > value_stopping_mse:
-                print(f'mse smaller than tolrence, {q}, {mse.item}')
+                print(f'mse smaller than tolerance | Value optim epoch {q} | MSE: {mse.item()}')
                 break
 
     # saving value model
@@ -173,5 +173,6 @@ def train_model(value_model,
     # evaluation score at the end of iteration
     score = evaluate_score(rewards, sample)
     evaluation_score.append(score)
+    print(evaluation_score[-1][0])
 
     return traj_time, epoch_time
