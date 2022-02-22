@@ -49,6 +49,7 @@ class FCCA(nn.Module):
         self.rescale_fn = lambda x: (x - self.nn_min) * (self.env_max - self.env_min) / (self.nn_max - self.nn_min) + self.env_min
         self.descale_fn = lambda x: (x - self.env_min) * (self.nn_max - self.nn_min) / (self.env_max - self.env_min) + self.nn_min
 
+
     def forward(self, x):
         """
         Feed forwarding in NN net
@@ -65,19 +66,16 @@ class FCCA(nn.Module):
         # feed forwards to layers
         x = F.relu(self.linear_0(x))
         x = F.relu(self.linear_1(x))
-        return self.linear_2(x)
-
+        return 1.0 + F.softplus(self.linear_2(x))
+    
     @torch.jit.ignore
     def get_predictions(self, states, actions):
         """
         To compute log probability of taken action and entropy of taken action from the distribution.
-
         Args:
             states: input array, pressure array
             actions: action array
-
         Returns: tensors of log probability and tensor of entropy
-
         """
 
         # get mean and std of action for the supplied state
@@ -86,14 +84,14 @@ class FCCA(nn.Module):
         alpha = alpha.squeeze()
         beta = beta.squeeze()
         # get distribution from mean and std by feed forward
-        dist = torch.distributions.Beta(alpha.exp(), beta.exp())
+        dist = torch.distributions.Beta(alpha, beta)
         d_actions = self.descale_fn(torch.from_numpy(actions))
         # compute log probabilities and entropy
         logpas = dist.log_prob(d_actions)
         entropies = dist.entropy()
 
         return logpas, entropies
-    
+
     @torch.jit.ignore
     def select_action(self, states):
         """Samples an action given the states using the policy network
@@ -110,14 +108,23 @@ class FCCA(nn.Module):
         """
         # Get alpha and beta coefficients of action for the supplied state
         output_layer = self.forward(torch.from_numpy(states))
-        alpha, beta = output_layer[0], output_layer[1]
+        alpha, beta = output_layer[:,:,0], output_layer[:,:,1]
         alpha = alpha.squeeze()
         beta = beta.squeeze()
         # Get beta distribution
-        dist = torch.distributions.Beta(alpha.exp(), beta.exp())
+        dist = torch.distributions.Beta(alpha, beta)
         # Sample action from distribution
-        action = dist.sample()
-        return action.detach().cpu().item()
+        action_pre_scale = dist.sample().detach().cpu().item()
+        action = self.rescale_fn(action_pre_scale)
+        
+        action_mean_pre_scale = dist.mean.detach().cpu().item()
+        action_mean = self.rescale_fn(action_mean_pre_scale)
+        
+        action_log_std_pre_scale = dist.stddev.detach().cpu().item()
+        # Still unscaled to match previous model output
+        action_log_std = action_log_std_pre_scale #self.rescale_fn(action_log_std_pre_scale)
+        
+        return action, action_mean, action_log_std
     
 
 class FCV(nn.Module):
@@ -128,7 +135,6 @@ class FCV(nn.Module):
     def __init__(self, input_dim, hidden_dims):
         """
         The output layer dimensions are 1 neuron. The neuron in output layer represents value of the state.
-
         Args:
             input_dim: input dimensions are equal to number of pressure sensors
                         sensors -> p values of patches at surface of cylinder.

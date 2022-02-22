@@ -65,14 +65,25 @@ def model_trace_update(model, sample):
     """
 
     path = "results/models"
+    no_torchscript_path = path + "/no_torchscript"
     base_path = "env/base_case/agentRotatingWallVelocity"
     os.makedirs(path, exist_ok=True)
+    os.makedirs(no_torchscript_path, exist_ok=True)
 
     # tracing policy model
     traced_cell = torch.jit.script(model)
 
     # saving model to disc memory for post processing
     traced_cell.save(path + f"/policy_{sample}.pt")
+    
+    # save model to disc without torchscript for post processing
+    torch.save(model.state_dict(), (no_torchscript_path + f"/policy_no_torchscript_{sample}.pt"))
+
+    # remove previous model, in order to use the latest
+    os.system(f"rm {base_path}/policy_no_torchscript.pt")
+
+    # saving model to openFOAM dirs
+    os.system(f"cp {no_torchscript_path}/policy_no_torchscript_{sample}.pt {base_path}/policy_no_torchscript.pt")
 
     # remove previous model, in order to use the latest
     os.system(f"rm {base_path}/policy.pt")
