@@ -9,6 +9,7 @@ from read_trajectory_data import *
 from cal_R_gaes import *
 from check_traj import *
 from utils import cat_prediction_feature_vector, write_model_generated_trajectory_data_to_file
+from model.model_env import modelEnv
 
 # If machine = 'local' then the functions from env_local will be imported
 # If machine = 'cluster' then the functions from env_cluster will be imported
@@ -270,10 +271,11 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
     start_states_omega_means = all_start_state_omega_means[idxes]
     start_states_omega_log_std = all_start_state_omega_log_std[idxes]
     
-    # To check if the trajectories is sampled
+    # Get number of trajectories to be used
     n_traj = start_states_trajectory.shape[0]
     assert n_traj > 0
 
+    # Get number of time steps
     n_T = int((trajectory_length / (20 * delta_t) - 1))# / 6.5)
 
     # buffer initialization
@@ -288,7 +290,6 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
     action_log_stds = np.zeros((n_traj, n_T-n_steps - 1))
 
     # Prediction model initialization
-    from model.model_env import modelEnv
     model_parameters = {"pmin" : -1.6963981,
                         "pmax" : 2.028614,
                         "cdmin" : 2.9635367,
@@ -306,7 +307,7 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
                         "activation" : torch.nn.ReLU()
     }
     environment_model = modelEnv(environment_model_path, **model_parameters)
-    plotting = True
+    plotting = False
     if plotting == True:
         from matplotlib import pyplot as plt
         plt.close()
@@ -428,14 +429,5 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
         reward_buffer[i] = rewards[n_steps:n_T]
         return_buffer[i] = returns[n_steps:n_T]
         log_prob_buffer[i] = log_probs[n_steps:n_T-1]
-        # write_model_generated_trajectory_data_to_file(sample,
-        #                                               i,
-        #                                               np.expand_dims(coeff_data.t.to_numpy(), axis=1),
-        #                                               states,
-        #                                               np.expand_dims(coeff_data.c_d.to_numpy(), axis=1),
-        #                                               np.expand_dims(coeff_data.c_l.to_numpy(), axis=1),
-        #                                               np.expand_dims(np.append(actions,0), axis=1),
-        #                                               np.expand_dims(np.append(action_means,0), axis=1),
-        #                                               np.expand_dims(np.append(action_log_stds,0), axis=1))
     
     return state_buffer, action_buffer, reward_buffer, return_buffer, log_prob_buffer
