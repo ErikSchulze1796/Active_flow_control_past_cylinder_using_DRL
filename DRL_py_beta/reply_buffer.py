@@ -244,7 +244,7 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
         # policy_model = torch.jit.load(policy_model_path+f"policy_{sample-1}.pt")
 
     # model_path = f"model/trained_model/best_model_train_0.0001_n_history{n_steps}_neurons50_layers5.pt"
-    model_path = f"model/trained_model/retrainbest_model_train_0.0001_n_history{n_steps}_neurons50_layers5.pt"
+    environment_model_path = f"model/trained_model/retrainbest_model_train_0.0001_n_history{n_steps}_neurons50_layers5.pt"
     # start_states_path = f"model/samples/1000_random_start_states_p400_steps{n_steps}.pt"
     # start_states_log_p_path = f"model/samples/1000_random_start_states_p400_steps{n_steps}_log_probs.pt"
     # start_states_omega_mean_path = f"model/samples/1000_random_start_states_p400_steps{n_steps}_omega_means.pt"
@@ -256,7 +256,6 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
     all_start_states_log_p = all_data[:,:,-1]
     all_start_state_omega_means = all_data[:,:,-3]
     all_start_state_omega_log_std = all_data[:,:,-2]
-    
     
     # all_start_states_trajectory = torch.load(start_states_path)
     # all_start_states_log_p = torch.load(start_states_log_p_path)
@@ -278,15 +277,15 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
     n_T = int((trajectory_length / (20 * delta_t) - 1))# / 6.5)
 
     # buffer initialization
-    state_buffer = np.zeros((n_traj, n_T, n_sensor))
-    action_buffer = np.zeros((n_traj, n_T - 1))
-    reward_buffer = np.zeros((n_traj, n_T))
-    return_buffer = np.zeros((n_traj, n_T))
-    log_prob_buffer = np.zeros((n_traj, n_T - 1))
+    state_buffer = np.zeros((n_traj, n_T-n_steps, n_sensor))
+    action_buffer = np.zeros((n_traj, n_T-n_steps - 1))
+    reward_buffer = np.zeros((n_traj, n_T-n_steps))
+    return_buffer = np.zeros((n_traj, n_T-n_steps))
+    log_prob_buffer = np.zeros((n_traj, n_T-n_steps - 1))
     
     # Not in buffer included
-    action_means = np.zeros((n_traj, n_T - 1))
-    action_log_stds = np.zeros((n_traj, n_T - 1))
+    action_means = np.zeros((n_traj, n_T-n_steps - 1))
+    action_log_stds = np.zeros((n_traj, n_T-n_steps - 1))
 
     # Prediction model initialization
     from model.model_env import modelEnv
@@ -306,12 +305,15 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
                         "n_neurons" : 50,
                         "activation" : torch.nn.ReLU()
     }
-    environment_model = modelEnv(model_path, **model_parameters)
-    plotting = False
+    environment_model = modelEnv(environment_model_path, **model_parameters)
+    plotting = True
     if plotting == True:
         from matplotlib import pyplot as plt
         plt.close()
         fig, axes = plt.subplots(3,1)
+        axes[0].axvline(x=30, linestyle="dashed", color="r")
+        axes[1].axvline(x=30, linestyle="dashed", color="r")
+        axes[2].axvline(x=30, linestyle="dashed", color="r")
 
     for i, start_state in enumerate(start_states_trajectory):
         # get the data from stored example tensor
@@ -342,13 +344,13 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
         # At this point only the data from the first states
         # that are needed for model prediction are stored.
         ########################## Environment Prediction ##########################
-
+        
+        # Create correct time steps for trajectory, although its is not necessary for the prediction and DRL training in general
         n_time_steps = int(trajectory_length / delta_t - 1)
         start_time = coeff_data[0,0]
-
         time_steps = (np.arange(0,n_time_steps) * delta_t + start_time)[19::20]
         time_steps = time_steps[:n_T]
-        # assert n_T == len(time_steps), f"Number of time steps and trajectory length must be equal. Got: n_T({n_T}) and len(time_steps){len(time_steps)}"
+
         # Environment prediction loop
         for j, time_step in enumerate(time_steps[n_steps:]):
             
@@ -383,27 +385,36 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
 
         ########################## Environment Prediction ##########################
         
-        # rewards and returns from cal_R_gaes.py -> calculate_rewards_returns
+        # Convert t, cd, cl data into dataframe for rewards function to evaluate
         coeff_data = pd.DataFrame(coeff_data, columns=["t", "c_d", "c_l"])
+        # rewards and returns from cal_R_gaes.py -> calculate_rewards_returns
         rewards, returns = calculate_rewards_returns(r_1, r_2, r_3, r_4, coeff_data, gamma, theta_, d_theta)
 
+        # Some live plotting for debugging
         if plotting == True:
             # print("means", action_means)
             axes[0].plot(action_means)
-            axes[0].axvline(x=30, linestyle="dashed", color="r")
             axes[0].set_ylabel("omega mean")
             axes[1].plot(coeff_data.c_d.values)
-            axes[1].axvline(x=30, linestyle="dashed", color="r")
             axes[1].set_ylabel("cD")
             axes[2].plot(coeff_data.c_l.values)
-            axes[2].axvline(x=30, linestyle="dashed", color="r")
             axes[2].set_ylabel("cL")
             plt.pause(0.005)
 
         with torch.no_grad():
             # Get log probabilities from policy network
             logpas_pred, _ = policy_model.get_predictions(np.expand_dims(states,axis=0), np.expand_dims(actions_,axis=0))
-            log_probs_ = np.append(log_probs_, logpas_pred.squeeze()[30:], axis=0)
+            log_probs_ = logpas_pred.squeeze()#np.append(log_probs_, logpas_pred.squeeze()[30:], axis=0)
+
+        write_model_generated_trajectory_data_to_file(sample,
+                                                      i,
+                                                      np.expand_dims(coeff_data.t.to_numpy(), axis=1),
+                                                      states,
+                                                      np.expand_dims(coeff_data.c_d.to_numpy(), axis=1),
+                                                      np.expand_dims(coeff_data.c_l.to_numpy(), axis=1),
+                                                      np.expand_dims(actions_, axis=1),
+                                                      np.expand_dims(action_means, axis=1),
+                                                      np.expand_dims(action_log_stds, axis=1))
 
         actions = actions_[:-1]
         action_means = action_means[:-1]
@@ -412,18 +423,19 @@ def fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, 
         log_probs = log_probs_[:-1] # logpas_pred.squeeze()[:-1]
 
         # appending values in buffer
-        state_buffer[i] = states[:n_T, :]
-        action_buffer[i] = actions[:n_T-1]
-        reward_buffer[i] = rewards[:n_T]
-        return_buffer[i] = returns[:n_T]
-        log_prob_buffer[i] = log_probs[:n_T-1]
-        write_model_generated_trajectory_data_to_file(sample,
-                                                      i,
-                                                      np.expand_dims(coeff_data.t.to_numpy(), axis=1),
-                                                      states, np.expand_dims(coeff_data.c_d.to_numpy(), axis=1),
-                                                      np.expand_dims(coeff_data.c_l.to_numpy(), axis=1),
-                                                      np.expand_dims(np.append(actions,0), axis=1),
-                                                      np.expand_dims(np.append(action_means,0), axis=1),
-                                                      np.expand_dims(np.append(action_log_stds,0), axis=1))
+        state_buffer[i] = states[n_steps:n_T, :]
+        action_buffer[i] = actions[n_steps:n_T-1]
+        reward_buffer[i] = rewards[n_steps:n_T]
+        return_buffer[i] = returns[n_steps:n_T]
+        log_prob_buffer[i] = log_probs[n_steps:n_T-1]
+        # write_model_generated_trajectory_data_to_file(sample,
+        #                                               i,
+        #                                               np.expand_dims(coeff_data.t.to_numpy(), axis=1),
+        #                                               states,
+        #                                               np.expand_dims(coeff_data.c_d.to_numpy(), axis=1),
+        #                                               np.expand_dims(coeff_data.c_l.to_numpy(), axis=1),
+        #                                               np.expand_dims(np.append(actions,0), axis=1),
+        #                                               np.expand_dims(np.append(action_means,0), axis=1),
+        #                                               np.expand_dims(np.append(action_log_stds,0), axis=1))
     
     return state_buffer, action_buffer, reward_buffer, return_buffer, log_prob_buffer
