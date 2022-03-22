@@ -163,6 +163,6 @@ BibTex citation :
   publisher    = {Zenodo},
   version      = {1.0},
   doi          = {10.5281/zenodo.6375575},
-  url          = {https://doi.org/10.5281/zenodo.6375575}  [Titel anhand dieser DOI in Citavi-Projekt übernehmen] 
+  url          = {https://doi.org/10.5281/zenodo.6375575}
 }
 ```
