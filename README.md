@@ -73,7 +73,7 @@ module load singularity/3.6.0rc2
 singularity shell of_v2012.sif
 # now we are operating from inside the container
 source /usr/lib/openfoam/openfoam2012/etc/bashrc
-cd /DRL_py/agentRotatingWallVelocity/
+cd /DRL_py_beta/agentRotatingWallVelocity/
 wmake
 ```
 
@@ -150,17 +150,19 @@ Reset:
 
 # Report
 
-The report for this study : TBD
+The report for this study : https://doi.org/10.5281/zenodo.6375575
 
-BibTex citation : TBD
-<!--- ``` --->
-<!--- @misc{, --->
-  <!--- author       = {Erik Schulze}, --->
-  <!--- title        = {{Model-based Reinforcement Learning for Accelerated Learning From CFD Simulations}}, --->
-  <!--- month        = , --->
-  <!--- year         = , --->
-  <!--- publisher    = {}, --->
-  <!--- doi          = {}, --->
-  <!--- url          = {} --->
-<!--- } --->
-<!--- ``` --->
+BibTex citation : 
+```
+@misc{schulze_erik_2022_6375575,
+  author       = {Schulze, Erik},
+  title        = {{Model-based Reinforcement Learning for Accelerated 
+                   Learning From CFD Simulations}},
+  month        = mar,
+  year         = 2022,
+  publisher    = {Zenodo},
+  version      = {1.0},
+  doi          = {10.5281/zenodo.6375575},
+  url          = {https://doi.org/10.5281/zenodo.6375575}
+}
+```
