@@ -124,7 +124,7 @@ class FCCA(nn.Module):
         # Still unscaled to match previous model output
         action_log_std = action_log_std_pre_scale #self.rescale_fn(action_log_std_pre_scale)
         
-        return action, action_mean, action_log_std
+        return action, action_mean, action_log_std, alpha, beta
     
 
 class FCV(nn.Module):

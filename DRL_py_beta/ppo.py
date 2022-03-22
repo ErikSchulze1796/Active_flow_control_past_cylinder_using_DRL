@@ -9,6 +9,7 @@ import time
 from reply_buffer import *
 from eval_score_and_trace_update import *
 
+# from reply_buffer_OLD import fill_buffer_from_environment_model_total
 
 def train_model(value_model,
                 policy_model,
@@ -75,7 +76,8 @@ def train_model(value_model,
     # getting variable for ppo algorithm from reply_buffer.py
     traj_start_time = time.perf_counter()
     # states, actions, rewards, returns, logpas = fill_buffer(env, sample, n_sensor, gamma, r_1, r_2, r_3, r_4, action_bounds)
-    states, actions, rewards, returns, logpas = fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, r_3, r_4, 0.6, 2.5e-4, 30, 25, policy_model, action_bounds)
+    states, actions, rewards, returns, logpas = fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, r_3, r_4, 1.15, 2.5e-4, 30, 25, policy_model, action_bounds)
+    # states, actions, rewards, returns, logpas = fill_buffer_from_environment_model_total(sample, n_sensor, gamma, r_1, r_2, r_3, r_4, 1.15, 2.5e-4, 30, 25, policy_model, action_bounds)
 
     traj_time = (time.perf_counter() - traj_start_time)
 

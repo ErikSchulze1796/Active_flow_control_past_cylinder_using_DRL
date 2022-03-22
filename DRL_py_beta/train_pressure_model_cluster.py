@@ -1,226 +1,142 @@
 """
 This file contains the setup and trainin procedures
-for the MLP pressure prediction model
+for the feed forward neural network used as pressure prediction environment model
 """
 
-from os.path import isdir
-from os import makedirs
 import datetime
+from os import makedirs
+from os.path import isdir
 
 import torch as pt
+from torch.utils.data.dataset import random_split
 
-from model.nnEnvironmentModel import FFNN
-from model.model_training import optimize_model
-from model.preprocessing.preprocessing import data_scaling, generate_labeled_data, split_data, MinMaxScaler
-from model.model_evaluation import evaluate_model
-from plotting.plot_data import plot_loss, plot_evaluation, plot_feature_space_error_map
+from environment_dataset import EnvironmentStateDataset
+from model.model_training_weigthed_features import optimize_model_weighted_features
+from model.nnEnvironmentModel import FFNN, WrapperModel
+from plotting.plot_data import plot_loss
+
 
 def main():
     
+    # ========================
     # Seeding
     pt.manual_seed(0)
+    # Threading
+    # pt.set_num_threads(16)
 
-    location = "DRL_py_beta/training_pressure_model/initial_trajectories/initial_trajectory_data_train_set_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
-    data = pt.load(location)
-    
-    # Grid search setup
-    epochs = 10000
-    learning_rates_space = [0.0001]
-    hidden_layers_space = [5]
-    neurons_space = [50]
-    steps_space = [4]
+    # ========================
+    # Model parameters
+    hidden_layer = 5
+    neurons = 256
+    n_steps_history = 30
     n_sensors = 400
-    # Keep only every nth pressure sensor of input state
-    every_nth_element = 25
+    # Keep only every nth pressure sensor of input state, uniformly distributed over cylinder surface
+    # Only for environment model input not for DRL agent input
+    every_nth_element = 25 # corresponds to 16 pressure sensors
     n_sensors_keep = int(n_sensors / every_nth_element)
     assert n_sensors % every_nth_element == 0, "You can only keep an even number of sensors!"
     # n_inputs = no. of p sensors / every_nth_element + omega value
     n_inputs = int(400 / every_nth_element + 1)
     output = 400 + 2
-    batch_size = 32
-    for lr in learning_rates_space:
-        for hidden_layer in hidden_layers_space:
-            for neurons in neurons_space:
-                for n_steps_history in steps_space:
 
-                    # Draw randomly k sample trajectories from all data
-                    # perm = pt.randperm(data.size(0))
-                    # k = 30
-                    # idx = perm[:k]
-                    # samples = data[idx]
-                    # data = samples
-                    
-                    data_norm, scaler_pressure, scaler_cd, scaler_cl, scaler_omega = data_scaling(data)
-                    data_labeled = generate_labeled_data(data_norm, n_steps_history, every_nth_element)
-                    train_data, val_data = split_data(data_labeled)
-                    # data_labeled = generate_labeled_data(data, n_steps_history, every_nth_element)
-                    # train_data, val_data, test_data = split_data(data_labeled)
-                    
-                    ######################################
-                    # Training
-                    ######################################
-                    # DATA SHAPE: t, p400, cd, cl, omega
-                    
-                    model_params = {
-                        "n_inputs": n_steps_history * n_inputs,
-                        "n_outputs": output,
-                        "n_layers": hidden_layer,
-                        "n_neurons": neurons,
-                        "activation": pt.nn.ReLU(),
-                        "n_steps": n_steps_history,
-                        "n_p_sensors": n_sensors_keep,
-                    }
-                    #     "p_min": p_min,
-                    #     "p_max": p_max,
-                    #     "c_d_min": c_d_min,
-                    #     "c_d_max": c_d_max,
-                    #     "c_l_min": c_l_min,
-                    #     "c_l_max": c_l_max,
-                    #     "omega_min": omega_min,
-                    #     "omega_max": omega_max
-                    # }
+    model_params = {
+        "n_inputs": n_steps_history * n_inputs,
+        "n_outputs": output,
+        "n_layers": hidden_layer,
+        "n_neurons": neurons,
+        "activation": pt.nn.ReLU(),
+        "n_steps": n_steps_history,
+        "n_p_sensors": n_sensors_keep,
+    }
 
-                    model = FFNN(**model_params)
-                    save_model_in = f"DRL_py_beta/training_pressure_model/thesis_quality/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{n_sensors_keep}_eps{epochs}/"
-                    if not isdir(save_model_in):
-                        makedirs(save_model_in)
-                    
-                    # Actually train model
-                    start = datetime.datetime.now()
-                    train_loss, val_loss = optimize_model(model, train_data[0], train_data[1],
-                                                        val_data[0], val_data[1], n_steps_history,
-                                                        n_neurons=model_params["n_neurons"],
-                                                        n_layers=model_params["n_layers"],
-                                                        batch_size=batch_size,
-                                                        epochs=epochs, save_best=save_model_in, lr=lr)
-                    end = datetime.datetime.now()
-                    duration = end - start
-                    run_data_file_path = save_model_in + f"run_data_{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_{len(data)}_p{n_sensors_keep}_eps{epochs}.txt"
-                    with open(run_data_file_path, 'a') as file:
-                        file.write(f'Training duration: {duration}\n')
-                        file.write(f'No. of epochs: {epochs}\n')
-                        file.write(f'Learning rate: {lr}\n')
-                        file.write(f'Batch size: {batch_size}\n')
-                        file.write(f'Neurons: {neurons}\n')
-                        file.write(f'Hidden layers: {hidden_layer}\n')
-                        file.write(f'No. of subsequent time steps: {n_steps_history}\n')
-                        file.write(f'No. of trajectories: {len(data)}\n')
-                        file.write(f'No. of pressure sensors as input: {n_sensors_keep}\n')
+    # ========================
+    # Train parameters
+    batch_size = 10000
+    epochs = 10000
+    lr = 0.0001
+    do_retrain = False
 
+    # ========================
+    # Parameters for data scaling
+    p_min = -1.6963981
+    p_max = 2.028614
+    c_d_min = 2.9635367
+    c_d_max = 3.4396918
+    c_l_min = -1.8241948
+    c_l_max = 1.7353026
+    omega_min = -9.999999
+    omega_max = 10.0
 
-                    # Min/Max Scaler wrapper model
-                    # wrapper = WrapperModel(model,
-                    #                        p_min, p_max,
-                    #                        omega_min, omega_max,
-                    #                        c_d_min, c_d_max,
-                    #                        c_l_min, c_l_max,
-                    #                        n_steps_history,
-                    #                        n_sensors_keep)
+    # ========================
+    # Data loading
+    location_train_features = f"./training_pressure_model/initial_trajectories/initial_trajectory_data_features_train_set_pytorch_steps30_ep40_p16-omega.pt"
+    location_train_labels = f"./training_pressure_model/initial_trajectories/initial_trajectory_data_labels_train_set_pytorch_steps30_ep40_p400-cd-cl.pt"
 
-                    # train_loss, val_loss = optimize_model(wrapper, train_data[0], train_data[1],
-                    #                                     val_data[0], val_data[1], n_steps_history,
-                    #                                     n_neurons=model_params["n_neurons"],
-                    #                                     n_layers=model_params["n_layers"],
-                    #                                     batch_size=batch_size, 
-                    #                                     epochs=epochs, save_best=save_model_in, lr=lr)
+    dataset = EnvironmentStateDataset(location_train_features, location_train_labels)
 
-                    # Plot data
-                    plot_loss(train_loss,
-                                val_loss,
-                                loss_type="MSE", 
-                                lr=lr,
-                                n_neurons=model_params["n_neurons"],
-                                n_layers=model_params["n_layers"],
-                                n_steps_history=n_steps_history,
-                                save_plots_in=save_model_in, show=False)
+    train_set_size = int(len(dataset)*0.90)
+    val_set_size = len(dataset) - train_set_size
+    train_dataset, val_dataset = random_split(dataset, [train_set_size, val_set_size])
 
-                    model_path = "{}best_model_train_{}_n_history{}_neurons{}_layers{}.pt".format(save_model_in, lr, n_steps_history, model_params["n_neurons"], model_params["n_layers"])
-                    test_data_path = "DRL_py_beta/training_pressure_model/initial_trajectories/initial_trajectory_data_test_set_pytorch_ep100_traj992_t-p400-cd-cl-omega.pt"
+    train_loader = pt.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = pt.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 
-                    from model.nnEnvironmentModel import WrapperModel
-                    p_min = -1.6963981
-                    p_max = 2.028614
-                    c_d_min = 2.9635367
-                    c_d_max = 3.4396918
-                    c_l_min = -1.8241948
-                    c_l_max = 1.7353026
-                    omega_min = -9.999999
-                    omega_max = 10.0
-                    # Min/Max Scaler wrapper model
-                    model.load_state_dict(pt.load(model_path))
-                    wrapper = WrapperModel(model,
-                                           p_min, p_max,
-                                           omega_min, omega_max,
-                                           c_d_min, c_d_max,
-                                           c_l_min, c_l_max,
-                                           n_steps_history,
-                                           n_sensors_keep)
-                    # wrapper.output_rescaling(False)
+    # =======================
+    # Model instantiation
+    model = FFNN(**model_params)
+    # Min/Max Scaler wrapper model
+    wrapper = WrapperModel(model,
+                            p_min, p_max,
+                            omega_min, omega_max,
+                            c_d_min, c_d_max,
+                            c_l_min, c_l_max,
+                            n_steps_history,
+                            n_sensors_keep)
+    # Model saving
+    save_model_in = f"./training_pressure_model/FFNN/weighted/{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_p{n_sensors_keep}_eps{epochs}/"
+    if not isdir(save_model_in):
+        makedirs(save_model_in)
+    # Model loading if retraining
+    if do_retrain:
+        load_model_from = f"./training_pressure_model/FFNN/best_model_train_0.0001_n_history30_neurons50_layers5_backup.pt"
+        wrapper.load_state_dict(pt.load(load_model_from))
 
-                    test_data = pt.load(test_data_path)
-                    scaler_pressure = MinMaxScaler()
-                    scaler_pressure.fit(pt.Tensor([p_min, p_max]))
-                    # test_data[:,:,1:-3] = scaler_pressure.scale(test_data[:,:,1:-3])
-                    scaler_cd = MinMaxScaler()
-                    scaler_cd.fit(pt.Tensor([c_d_min, c_d_max]))
-                    # test_data[:,:,-3] = scaler_cd.scale(test_data[:,:,-3])
-                    scaler_cl = MinMaxScaler()
-                    scaler_cl.fit(pt.Tensor([c_l_min, c_l_max]))
-                    # test_data[:,:,-2] = scaler_cl.scale(test_data[:,:,-2])
-                    scaler_omega = MinMaxScaler()
-                    scaler_omega.fit(pt.Tensor([omega_min, omega_max]))
-                    # test_data[:,:,-1] = scaler_omega.scale(test_data[:,:,-1])
-                    
-                    test_data = generate_labeled_data(test_data, n_steps_history, every_nth_element)
-                    #idx_test_trajectory = 1
-                    perm = pt.randperm(test_data[0].size(0))
-                    k = 1
-                    idx_test_trajectory = perm[:k]
-                    time_steps = data[0,n_steps_history:,0]
-                    test_features_norm = test_data[0][idx_test_trajectory,:,:].squeeze()
-                    test_labels_norm = test_data[1][idx_test_trajectory,:,:].squeeze()
-                    
-                    test_loss_l2, test_loss_lmax, r2score, prediction_p, prediction_cd, prediction_cl = evaluate_model(wrapper,
-                                                                                                                       test_features_norm,
-                                                                                                                       test_labels_norm,
-                                                                                                                       model_path,
-                                                                                                                       n_steps_history,
-                                                                                                                       every_nth_element,
-                                                                                                                       n_inputs)
+    # =======================
+    # Train loop
+    start = datetime.datetime.now()
+    train_loss, val_loss = optimize_model_weighted_features(wrapper, train_loader, val_loader,
+                                            batch_size,
+                                            n_steps_history,
+                                            n_neurons=model_params["n_neurons"],
+                                            n_layers=model_params["n_layers"],
+                                            epochs=epochs, save_best=save_model_in, lr=lr)
+    end = datetime.datetime.now()
+    duration = end - start
+    
+    # =======================
+    # Write training meta data to file
+    run_data_file_path = save_model_in + f"run_data_{neurons}_{hidden_layer}_{n_steps_history}_{lr}_{batch_size}_p{n_sensors_keep}_eps{epochs}.txt"
+    with open(run_data_file_path, 'a') as file:
+        file.write(f'Training duration: {duration}\n')
+        file.write(f'No. of epochs: {epochs}\n')
+        file.write(f'Learning rate: {lr}\n')
+        file.write(f'Batch size: {batch_size}\n')
+        file.write(f'No. of Samples: {len(train_dataset)}\n')
+        file.write(f'Neurons: {neurons}\n')
+        file.write(f'Hidden layers: {hidden_layer}\n')
+        file.write(f'No. of subsequent time steps: {n_steps_history}\n')
+        file.write(f'No. of pressure sensors as input: {n_sensors_keep}\n')
 
-                    labels_p_norm = test_labels_norm[:,:-2]
+    # =======================
+    # Plotting
+    plot_loss(train_loss,
+                val_loss,
+                loss_type="MSE", 
+                lr=lr,
+                n_neurons=model_params["n_neurons"],
+                n_layers=model_params["n_layers"],
+                n_steps_history=n_steps_history,
+                save_plots_in=save_model_in, show=False)
 
-                    # labels[:,:-2] = scaler_pressure.rescale(labels[:,:-2])
-                    labels_cd = scaler_cd.rescale(test_labels_norm[:,-2])
-                    labels_cl = scaler_cl.rescale(test_labels_norm[:,-1])
-
-                    # prediction_p = scaler_pressure.rescale(prediction_p)
-                    prediction_cd = scaler_cd.rescale(prediction_cd)
-                    prediction_cl = scaler_cl.rescale(prediction_cl)
-
-
-                    plot_evaluation(time_steps,
-                                    labels_cd,
-                                    prediction_cd,
-                                    labels_cl,
-                                    prediction_cl,
-                                    test_loss_l2,
-                                    test_loss_lmax,
-                                    r2score,
-                                    save_model_in,
-                                    lr,
-                                    neurons,
-                                    hidden_layer,
-                                    n_steps_history)
-
-                    plot_feature_space_error_map(time_steps = time_steps,
-                                                reference = labels_p_norm,
-                                                prediction = prediction_p,
-                                                save_plots_in = save_model_in,
-                                                lr = lr,
-                                                n_neurons = model_params["n_neurons"],
-                                                n_layers = model_params["n_layers"],
-                                                n_steps_history = n_steps_history)
-        
 if __name__ == '__main__':
     main()

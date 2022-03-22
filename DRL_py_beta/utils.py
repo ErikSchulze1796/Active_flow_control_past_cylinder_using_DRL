@@ -108,10 +108,28 @@ def write_model_generated_trajectory_data_to_file(n_sample: int,
                                                   c_l_data: np.array,
                                                   omega_data: np.array,
                                                   omega_mean_data: np.array,
-                                                  omega_log_std: np.array):
+                                                  omega_log_std: np.array,
+                                                  alpha: np.array,
+                                                  beta: np.array,
+                                                  log_probs: np.array,
+                                                  entropy: np.array,
+                                                  theta: np.array,
+                                                  dtheta: np.array):
     
-    header = ["t", "c_d", "c_l", "omega", "omega_mean", "omega_log_std"] + [f"p{n}" for n in range(1,401)]
-    data = np.concatenate((t_data, c_d_data, c_l_data, omega_data, omega_mean_data, omega_log_std, p_data), axis=1)
+    header = ["t", "c_d", "c_l", "omega", "omega_mean", "omega_log_std", "alpha", "beta", "log_prob", "entropy", "theta_sum", "dt_theta_sum"] + [f"p{n}" for n in range(1,401)]
+    t_data = np.expand_dims(t_data, axis=1)
+    c_d_data = np.expand_dims(c_d_data, axis=1)
+    c_l_data = np.expand_dims(c_l_data, axis=1)
+    omega_data = np.expand_dims(omega_data, axis=1)
+    omega_mean_data = np.expand_dims(omega_mean_data, axis=1)
+    omega_log_std = np.expand_dims(omega_log_std, axis=1)
+    alpha = np.expand_dims(alpha, axis=1)
+    beta = np.expand_dims(beta, axis=1)
+    log_probs = np.expand_dims(log_probs, axis=1)
+    entropy = np.expand_dims(entropy, axis=1)
+    theta = np.expand_dims(theta, axis=1)
+    dtheta = np.expand_dims(dtheta, axis=1)
+    data = np.concatenate((t_data, c_d_data, c_l_data, omega_data, omega_mean_data, omega_log_std, alpha, beta, log_probs, entropy, theta, dtheta, p_data), axis=1)
     data_df = pd.DataFrame(data, columns=header)
     
     file_dir = f"./Data/model_related/sample_{n_sample}/trajectory_{n_trajectory}/"
