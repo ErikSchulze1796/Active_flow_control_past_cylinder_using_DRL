@@ -150,9 +150,10 @@ Reset:
 
 # Report
 
-The report for this study : https://zenodo.org/record/6375575#.YjmmuzUxlaR
+The report for this study : https://doi.org/10.5281/zenodo.6375575
 
 BibTex citation : 
+'''
 @misc{schulze_erik_2022_6375575,
   author       = {Schulze, Erik},
   title        = {{Model-based Reinforcement Learning for Accelerated 
@@ -164,3 +165,4 @@ BibTex citation :
   doi          = {10.5281/zenodo.6375575},
   url          = {https://doi.org/10.5281/zenodo.6375575}  [Titel anhand dieser DOI in Citavi-Projekt übernehmen] 
 }
+'''
