@@ -105,7 +105,7 @@ To show all running jobs of a user, use `squeue -u $USER`. Another helpful comma
 If you want to cancel a job just use the command `scancel JOBID`.
 
 ## Starting an Environement Model Training
-In order to start a training of the environment model the hyperparameters of the training and the trained model have to be set first. This can be done in the `train_pressure_model_cluster.py`. The trained model is a feed-forward neural network. Therefore the number of hidden layers and the number of neurons per layer can be set by changing the `hidden_layer` and `neurons` variables. Furthermore the number of time steps can be set by changing the `n_steps_history` variable in order to adjust the subsequent state to be used for the prediciton. By changing the `every_nth_element` variable the number of input sensors for the environment model can be set to reduce memory consumption. The ouput of 400 sensors stays untouched. The training hyperparameters can be adjusted by changing the `batch_size`, `epochs` and `lr` variables for the batch size, the number of epochs to be trained for and the learning rate.
+In order to start a training of the environment model the hyperparameters of the training and the trained model have to be set first. This can be done in the `train_pressure_model_cluster.py`. The trained model is a feed-forward neural network. Therefore the number of hidden layers and the number of neurons per layer can be set by changing the `hidden_layer` and `neurons` variables. Furthermore the number of time steps can be set by changing the `n_steps_history` variable in order to adjust the subsequent state to be used for the prediciton. By changing the `every_nth_element` variable the number of input sensors for the environment model can be set to reduce memory consumption. The ouput of 400 sensors stays untouched. The training hyperparameters can be adjusted by changing the `batch_size`, `epochs` and `lr` variables for the batch size, the number of epochs to be trained for and the learning rate. The training data is loaded from the locations for the features and lables specified by `location_train_features` and `location_train_labels` variables.
 
 The training can be started by simply executing the `train_pressure_model_cluster.py` script using:
 ```
@@ -115,6 +115,7 @@ or by using the slurm scheduler on the cluster using the slurm script:
 ```
 sbatch model_train_job.sh
 ```
+The model is then saved to the path specified by `save_model_in` variable.
 
 ## Starting a DRL Training
 
@@ -130,6 +131,8 @@ Then you have to copy the content of that folder into the ./env/baseline_case/ba
 Start the Training:
 
 `sbatch python_job.sh`
+
+The environment model used for the DRL training is specified in `reply_buffer.py` by `environment_model_path` variable in the `fill_buffer_from_environment_model_total(...)` function.
 
 ## Evaluate a specific Episode
 Inside a Setup Folder:
