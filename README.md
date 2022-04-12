@@ -104,7 +104,19 @@ sbatch jobscript cylinder2D_base
 To show all running jobs of a user, use `squeue -u $USER`. Another helpful command is `quota -s` to check the available disk space.
 If you want to cancel a job just use the command `scancel JOBID`.
 
-## Starting a Training
+## Starting an Environement Model Training
+In order to start a training of the environment model the hyperparameters of the training and the trained model have to be set first. This can be done in the `train_pressure_model_cluster.py`. The trained model is a feed-forward neural network. Therefore the number of hidden layers and the number of neurons per layer can be set by changing the `hidden_layer` and `neurons` variables. Furthermore the number of time steps can be set by changing the `n_steps_history` variable in order to adjust the subsequent state to be used for the prediciton. By changing the `every_nth_element` variable the number of input sensors for the environment model can be set to reduce memory consumption. The ouput of 400 sensors stays untouched. The training hyperparameters can be adjusted by changing the `batch_size`, `epochs` and `lr` variables for the batch size, the number of epochs to be trained for and the learning rate.
+
+The training can be started by simply executing the `train_pressure_model_cluster.py` script using:
+```
+python3 train_pressure_model_cluster.py
+```
+or by using the slurm scheduler on the cluster using the slurm script:
+```
+sbatch model_train_job.sh
+```
+
+## Starting a DRL Training
 
 Choose a setup: 
 
